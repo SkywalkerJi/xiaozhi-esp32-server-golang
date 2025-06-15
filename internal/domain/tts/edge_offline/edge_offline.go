@@ -12,7 +12,7 @@ import (
 
 	"github.com/gopxl/beep"
 	"github.com/gorilla/websocket"
-	"github.com/jolestar/go-commons-pool/v2"
+	pool "github.com/jolestar/go-commons-pool/v2"
 )
 
 var (
@@ -33,6 +33,15 @@ var (
 	initOnce sync.Once
 )
 
+// printPoolStats 打印连接池状态
+func printPoolStats() {
+	if globalPool == nil {
+		return
+	}
+	log.Infof("连接池状态 - 活跃连接数: %d, 空闲连接数: %d",
+		globalPool.GetNumActive(), globalPool.GetNumIdle())
+}
+
 // InitGlobalPool 初始化全局连接池
 func InitGlobalPool(serverURL string) {
 	initOnce.Do(func() {
@@ -44,6 +53,16 @@ func InitGlobalPool(serverURL string) {
 		}
 
 		globalPool = pool.NewObjectPool(context.Background(), factory, globalPoolConfig)
+
+		// 启动定期打印连接池状态的goroutine
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+
+			for range ticker.C {
+				printPoolStats()
+			}
+		}()
 	})
 }
 
@@ -244,7 +263,6 @@ func (p *EdgeOfflineTTSProvider) TextToSpeechStream(ctx context.Context, text st
 			log.Errorf("获取WebSocket连接失败: %v", err)
 			return
 		}
-		defer p.returnConnection(wrapper)
 
 		// 发送文本
 		err = wrapper.conn.WriteMessage(websocket.TextMessage, []byte(text))

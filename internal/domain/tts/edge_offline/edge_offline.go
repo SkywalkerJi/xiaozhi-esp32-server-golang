@@ -327,6 +327,8 @@ func (p *EdgeOfflineTTSProvider) TextToSpeechStream(ctx context.Context, text st
 					}
 					return
 				}
+				p.returnConnection(wrapper)
+				return
 			}
 		}
 	}()

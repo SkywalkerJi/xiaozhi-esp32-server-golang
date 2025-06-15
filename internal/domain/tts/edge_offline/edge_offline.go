@@ -20,8 +20,8 @@ var (
 	globalPool *pool.ObjectPool
 	// 全局连接池配置
 	globalPoolConfig = &pool.ObjectPoolConfig{
-		MaxTotal:                10,
-		MaxIdle:                 5,
+		MaxTotal:                300,
+		MaxIdle:                 20,
 		MinIdle:                 1,
 		TestOnBorrow:            true,
 		TestOnReturn:            true,

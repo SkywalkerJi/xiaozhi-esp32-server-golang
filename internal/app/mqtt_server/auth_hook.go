@@ -64,9 +64,8 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqttServer.Client, pk packets.Packe
 		return true
 	}
 
-	// 如果没有配置签名密钥，回退到原来的AES验证逻辑
-	log.Warnf("缺少OTA签名密钥配置，使用AES验证方式")
-	return h.validateWithAes(username, password)
+	log.Warnf("缺少mqtt_server.signature_key签名密钥配置")
+	return false
 }
 
 // validateWithAes 使用AES方式验证密码（向后兼容）

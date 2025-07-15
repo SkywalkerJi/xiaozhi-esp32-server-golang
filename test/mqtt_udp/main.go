@@ -160,6 +160,8 @@ func main() {
 		fmt.Println("获取设备配置失败:", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("config: %+v\n", config)
 	serverConfig = config
 
 	if config.Activation.Code != "" {
@@ -214,6 +216,8 @@ func connectMQTT(config *ServerResponse) (mqtt.Client, bool) {
 		protocol = "tcp"
 	}
 	brokerUrl := fmt.Sprintf("%s://%s:%s", protocol, endpoint, port)
+
+	fmt.Printf("brokerUrl: %s\n", brokerUrl)
 
 	// 设置 TLS 配置
 	tlsConfig := &tls.Config{

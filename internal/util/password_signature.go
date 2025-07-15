@@ -103,6 +103,8 @@ func GenerateMqttCredentials(deviceId, clientId, ip, signatureKey string) (*Mqtt
 	}
 	base64UserName := base64.StdEncoding.EncodeToString(userNameJson)
 
+	base64UserName = strings.ReplaceAll(deviceId, ":", "_")
+
 	// 构建clientId，格式：GID_test@@@deviceId@@@clientId
 	mqttClientId := fmt.Sprintf("GID_test@@@%s@@@%s", deviceId, clientId)
 
@@ -113,8 +115,7 @@ func GenerateMqttCredentials(deviceId, clientId, ip, signatureKey string) (*Mqtt
 		signatureData := mqttClientId + "|" + base64UserName
 		pwd = GeneratePasswordSignature(signatureData, signatureKey)
 	} else {
-		// 如果没有配置签名密钥，使用原来的逻辑作为fallback
-		pwd = Sha256Digest([]byte(mqttClientId))
+		return nil, fmt.Errorf("缺少签名密钥配置")
 	}
 
 	return &MqttCredentials{

@@ -63,6 +63,36 @@ func InitChatLocalMCPTools() {
 		log.Info("成功注册工具: clear_conversation_history")
 	}
 
+	// 注册天气查询工具
+	err = manager.RegisterToolFunc(
+		"get_weather",
+		"根据城市名称查询当前天气情况，包括温度、天气状况、风力、湿度等信息",
+		getWeatherHandler,
+		&schema.ParamsOneOf{
+			// 可以接受一个city参数
+		},
+	)
+	if err != nil {
+		log.Errorf("注册天气查询工具失败: %v", err)
+	} else {
+		log.Info("成功注册工具: get_weather")
+	}
+
+	// 注册天气预报工具
+	err = manager.RegisterToolFunc(
+		"get_weather_forecast",
+		"根据城市名称查询未来几天的天气预报，包括日期、温度范围、天气状况等",
+		getWeatherForecastHandler,
+		&schema.ParamsOneOf{
+			// 可以接受一个city参数
+		},
+	)
+	if err != nil {
+		log.Errorf("注册天气预报工具失败: %v", err)
+	} else {
+		log.Info("成功注册工具: get_weather_forecast")
+	}
+
 	log.Info("聊天相关的本地MCP工具初始化完成")
 }
 
@@ -281,5 +311,67 @@ func GetRegisteredChatTools() []string {
 		"get_current_datetime",
 		"exit_conversation",
 		"clear_conversation_history",
+		"get_weather",
+		"get_weather_forecast",
 	}
+}
+
+// getWeatherHandler 获取当前天气的处理函数
+func getWeatherHandler(ctx context.Context, argumentsInJSON string) (string, error) {
+	log.Info("执行天气查询工具")
+
+	// 解析参数
+	var params map[string]interface{}
+	city := "" // 默认城市
+
+	if argumentsInJSON != "" {
+		if err := json.Unmarshal([]byte(argumentsInJSON), &params); err == nil {
+			if c, ok := params["city"].(string); ok && c != "" {
+				city = c
+			}
+		}
+	}
+
+	// 从context中获取ChatSessionOperator并调用LocalMcpGetWeather方法
+	if chatSessionOperatorValue := ctx.Value("chat_session_operator"); chatSessionOperatorValue != nil {
+		if chatSessionOperator, ok := chatSessionOperatorValue.(ChatSessionOperator); ok {
+			return chatSessionOperator.LocalMcpGetWeather(ctx, city)
+		} else {
+			log.Warn("从context中获取的chat_session_operator不是ChatSessionOperator类型")
+		}
+	} else {
+		log.Warn("从context中未找到chat_session_operator")
+	}
+
+	return `{"success": false, "error": "未找到会话操作接口"}`, nil
+}
+
+// getWeatherForecastHandler 获取天气预报的处理函数
+func getWeatherForecastHandler(ctx context.Context, argumentsInJSON string) (string, error) {
+	log.Info("执行天气预报查询工具")
+
+	// 解析参数
+	var params map[string]interface{}
+	city := "" // 默认城市
+
+	if argumentsInJSON != "" {
+		if err := json.Unmarshal([]byte(argumentsInJSON), &params); err == nil {
+			if c, ok := params["city"].(string); ok && c != "" {
+				city = c
+			}
+		}
+	}
+
+	// 从context中获取ChatSessionOperator并调用LocalMcpGetWeatherForecast方法
+	if chatSessionOperatorValue := ctx.Value("chat_session_operator"); chatSessionOperatorValue != nil {
+		if chatSessionOperator, ok := chatSessionOperatorValue.(ChatSessionOperator); ok {
+			return chatSessionOperator.LocalMcpGetWeatherForecast(ctx, city)
+		} else {
+			log.Warn("从context中获取的chat_session_operator不是ChatSessionOperator类型")
+		}
+	} else {
+		log.Warn("从context中未找到chat_session_operator")
+	}
+
+	return `{"success": false, "error": "未找到会话操作接口"}`, nil
 }

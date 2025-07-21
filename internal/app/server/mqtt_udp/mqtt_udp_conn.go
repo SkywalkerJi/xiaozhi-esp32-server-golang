@@ -22,6 +22,7 @@ type MqttUdpConn struct {
 	cancel context.CancelFunc
 
 	DeviceId string
+	ClientIP string // 存储客户端IP地址
 
 	PubTopic   string
 	MqttClient mqtt.Client
@@ -40,12 +41,13 @@ type MqttUdpConn struct {
 }
 
 // NewMqttUdpConn 创建一个新的 MqttUdpConn 实例
-func NewMqttUdpConn(deviceID string, pubTopic string, mqttClient mqtt.Client, udpServer *UdpServer, udpSession *UdpSession) *MqttUdpConn {
+func NewMqttUdpConn(deviceID string, clientIP string, pubTopic string, mqttClient mqtt.Client, udpServer *UdpServer, udpSession *UdpSession) *MqttUdpConn {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &MqttUdpConn{
 		ctx:      ctx,
 		cancel:   cancel,
 		DeviceId: deviceID,
+		ClientIP: clientIP,
 
 		PubTopic:   pubTopic,
 		MqttClient: mqttClient,
@@ -166,6 +168,10 @@ func (c *MqttUdpConn) Destroy() {
 	for _, cb := range c.onCloseCbList {
 		cb(c.DeviceId)
 	}
+}
+
+func (c *MqttUdpConn) GetIP() string {
+	return c.ClientIP
 }
 
 func (c *MqttUdpConn) CloseAudioChannel() error {

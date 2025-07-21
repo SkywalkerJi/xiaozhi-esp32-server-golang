@@ -4,6 +4,7 @@ go 1.23.9
 
 require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
+	github.com/bytedance/gopkg v0.1.2
 	github.com/cloudwego/eino v0.3.40
 	github.com/cloudwego/eino-ext/components/model/ollama v0.0.0-20250530094010-bd1c4fc20bbe
 	github.com/cloudwego/eino-ext/components/model/openai v0.0.0-20250530094010-bd1c4fc20bbe
@@ -16,7 +17,6 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hackers365/go-webrtcvad v0.0.0-20250711024710-dde35479e077
 	github.com/hraban/opus v0.0.0-20220302220929-eeacdbcb92d0
-	github.com/jolestar/go-commons-pool/v2 v2.1.2
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/mark3labs/mcp-go v0.31.0
 	github.com/mochi-mqtt/server/v2 v2.7.9
@@ -71,7 +71,6 @@ require (
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect

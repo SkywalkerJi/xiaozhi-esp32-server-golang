@@ -38,6 +38,17 @@ const (
 
 type SendAudioData func(audioData []byte) error
 
+// LocationInfo 位置信息
+type LocationInfo struct {
+	IP       string  `json:"ip"`       // 客户端IP
+	Province string  `json:"province"` // 省份
+	City     string  `json:"city"`     // 城市
+	District string  `json:"district"` // 区域
+	Address  string  `json:"address"`  // 详细地址
+	Lat      float64 `json:"lat"`      // 纬度
+	Lng      float64 `json:"lng"`      // 经度
+}
+
 // ClientState 表示客户端状态
 type ClientState struct {
 	// 对话历史
@@ -89,6 +100,9 @@ type ClientState struct {
 
 	IsTtsStart        bool //是否tts开始
 	IsWelcomeSpeaking bool //是否已经欢迎语
+
+	// 位置信息
+	LocationInfo *LocationInfo
 }
 
 func (c *ClientState) SetTtsStart(isStart bool) {

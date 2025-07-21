@@ -27,6 +27,9 @@ type IConn interface {
 
 	GetTransportType() string
 
+	// 获取客户端IP地址
+	GetIP() string
+
 	//获取私有数据
 	GetData(key string) (interface{}, error)
 }

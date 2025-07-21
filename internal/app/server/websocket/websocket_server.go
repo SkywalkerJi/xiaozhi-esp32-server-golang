@@ -165,8 +165,17 @@ func (s *WebSocketServer) internalHandleChat(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// 获取客户端IP
+	clientIP := r.Header.Get("X-Real-IP")
+	if clientIP == "" {
+		clientIP = r.Header.Get("X-Forwarded-For")
+	}
+	if clientIP == "" {
+		clientIP = r.RemoteAddr
+	}
+
 	// 适配为 IConn 接口
-	wsConn := NewWebSocketConn(conn, deviceID, isMqttUdp)
+	wsConn := NewWebSocketConn(conn, deviceID, clientIP, isMqttUdp)
 	if s.onNewConnection != nil {
 		s.onNewConnection(wsConn)
 	}

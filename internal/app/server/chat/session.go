@@ -605,9 +605,28 @@ func (s *ChatSession) actionDoChat(ctx context.Context, text string) error {
 
 	sessionID := clientState.SessionID
 
+	// 构建包含位置信息的系统提示词
+	systemPromptContent := clientState.SystemPrompt
+	if clientState.LocationInfo != nil {
+		locationText := ""
+		if clientState.LocationInfo.City != "" && clientState.LocationInfo.City != "未知" {
+			locationText = fmt.Sprintf("用户当前位置：%s", clientState.LocationInfo.Address)
+		}
+		if clientState.LocationInfo.IP != "" && clientState.LocationInfo.IP != "unknown" {
+			if locationText != "" {
+				locationText += fmt.Sprintf("，IP：%s", clientState.LocationInfo.IP)
+			} else {
+				locationText = fmt.Sprintf("用户IP：%s", clientState.LocationInfo.IP)
+			}
+		}
+		if locationText != "" {
+			systemPromptContent += "\n\n" + locationText + "。"
+		}
+	}
+
 	systemPrompt := schema.Message{
 		Role:    schema.System,
-		Content: clientState.SystemPrompt,
+		Content: systemPromptContent,
 	}
 	//system prompt
 	requestMessages := []schema.Message{

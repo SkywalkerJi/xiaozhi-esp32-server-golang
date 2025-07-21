@@ -262,5 +262,12 @@
     "你好，我是小智，今天有啥好玩的。", 
     "你好，我是小智，有什么需要帮助的。"
   ],
-  "wakeup_words": ["小智", "小知", "你好小智"]
+  "wakeup_words": ["小智", "小知", "你好小智"],
+  "amap": {
+    "api_key": "your_amap_api_key_here",
+    "ip_location_url": "https://restapi.amap.com/v3/ip",
+    "weather_url": "https://restapi.amap.com/v3/weather/weatherInfo",
+    "geocode_url": "https://restapi.amap.com/v3/geocode/geo",
+    "regeocode_url": "https://restapi.amap.com/v3/geocode/regeo"
+  }
 }

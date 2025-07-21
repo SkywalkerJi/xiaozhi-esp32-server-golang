@@ -21,6 +21,7 @@ type WebSocketConn struct {
 
 	conn     *websocket.Conn
 	deviceID string
+	clientIP string // 存储客户端IP地址
 
 	isMqttUdpBridge bool
 	recvCmdChan     chan []byte
@@ -31,13 +32,14 @@ type WebSocketConn struct {
 }
 
 // NewWebSocketConn 创建一个新的 WebSocketConn 实例
-func NewWebSocketConn(conn *websocket.Conn, deviceID string, isMqttUdpBridge bool) *WebSocketConn {
+func NewWebSocketConn(conn *websocket.Conn, deviceID string, clientIP string, isMqttUdpBridge bool) *WebSocketConn {
 	ctx, cancel := context.WithCancel(context.Background())
 	instance := &WebSocketConn{
 		ctx:             ctx,
 		cancel:          cancel,
 		conn:            conn,
 		deviceID:        deviceID,
+		clientIP:        clientIP,
 		isMqttUdpBridge: isMqttUdpBridge,
 		recvCmdChan:     make(chan []byte, 100),
 		recvAudioChan:   make(chan []byte, 100),
@@ -207,6 +209,10 @@ func (w *WebSocketConn) GetTransportType() string {
 
 func (w *WebSocketConn) GetData(key string) (interface{}, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (w *WebSocketConn) GetIP() string {
+	return w.clientIP
 }
 
 func (w *WebSocketConn) CloseAudioChannel() error {

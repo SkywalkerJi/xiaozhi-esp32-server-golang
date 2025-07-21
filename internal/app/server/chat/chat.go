@@ -9,9 +9,11 @@ import (
 	"xiaozhi-esp32-server-golang/constants"
 	types_conn "xiaozhi-esp32-server-golang/internal/app/server/types"
 	types_audio "xiaozhi-esp32-server-golang/internal/data/audio"
+	"xiaozhi-esp32-server-golang/internal/data/client"
 	. "xiaozhi-esp32-server-golang/internal/data/client"
 	userconfig "xiaozhi-esp32-server-golang/internal/domain/config"
 	"xiaozhi-esp32-server-golang/internal/domain/vad/silero_vad"
+	"xiaozhi-esp32-server-golang/internal/util"
 	log "xiaozhi-esp32-server-golang/logger"
 )
 
@@ -43,7 +45,7 @@ func NewChatManager(deviceID string, transport types_conn.IConn, options ...Chat
 
 	cm.transport.OnClose(cm.OnClose)
 
-	clientState, err := GenClientState(cm.ctx, cm.DeviceID)
+	clientState, err := GenClientState(cm.ctx, cm.DeviceID, cm.transport)
 	if err != nil {
 		log.Errorf("初始化客户端状态失败: %v", err)
 		return nil, err
@@ -60,7 +62,7 @@ func NewChatManager(deviceID string, transport types_conn.IConn, options ...Chat
 	return cm, nil
 }
 
-func GenClientState(pctx context.Context, deviceID string) (*ClientState, error) {
+func GenClientState(pctx context.Context, deviceID string, transport types_conn.IConn) (*ClientState, error) {
 	configProvider, err := userconfig.GetProvider()
 	if err != nil {
 		log.Errorf("获取 用户配置提供者失败: %+v", err)
@@ -111,7 +113,8 @@ func GenClientState(pctx context.Context, deviceID string) (*ClientState, error)
 			VoiceStop:            false,
 			SilenceThresholdTime: maxSilenceDuration,
 		},
-		SessionCtx: Ctx{},
+		SessionCtx:   Ctx{},
+		LocationInfo: &LocationInfo{}, // 初始化位置信息
 	}
 
 	ttsType := clientState.DeviceConfig.Tts.Provider
@@ -120,6 +123,35 @@ func GenClientState(pctx context.Context, deviceID string) (*ClientState, error)
 		clientState.OutputAudioFormat.SampleRate = 24000
 		clientState.OutputAudioFormat.FrameDuration = 20
 	}
+
+	// 异步获取位置信息
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("获取位置信息时发生错误: %v", r)
+			}
+		}()
+
+		clientIP := transport.GetIP()
+		log.Debugf("开始获取设备 %s 的位置信息，IP: %s", deviceID, clientIP)
+
+		amapAPI := util.NewAmapAPI()
+		locationInfo, err := amapAPI.GetLocationByIP(ctx, clientIP)
+		if err != nil {
+			log.Warnf("获取设备 %s 位置信息失败: %v", deviceID, err)
+			// 设置默认值
+			clientState.LocationInfo = &client.LocationInfo{IP: clientIP}
+		} else {
+			clientState.LocationInfo = &client.LocationInfo{
+				IP:       clientIP,
+				Province: locationInfo.Province,
+				City:     locationInfo.City,
+				District: locationInfo.District,
+				Address:  "未知位置",
+			}
+			log.Infof("设备 %s 位置信息获取成功: %s", deviceID, locationInfo.Address)
+		}
+	}()
 
 	return clientState, nil
 }

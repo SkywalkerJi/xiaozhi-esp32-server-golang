@@ -205,7 +205,9 @@ func (s *MqttUdpAdapter) processMessage() {
 
 				publicTopic := fmt.Sprintf("%s%s", client.ServerPubTopicPrefix, topicMacAddr)
 
-				deviceSession = NewMqttUdpConn(deviceId, publicTopic, s.client, s.udpServer, udpSession)
+				// TODO: 从UDP连接中获取真实的客户端IP
+				clientIP := "unknown"
+				deviceSession = NewMqttUdpConn(deviceId, clientIP, publicTopic, s.client, s.udpServer, udpSession)
 
 				strAesKey, strFullNonce := udpSession.GetAesKeyAndNonce()
 				deviceSession.SetData("aes_key", strAesKey)

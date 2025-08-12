@@ -251,9 +251,9 @@ type MusicItem struct {
 	//SongID string `json:"songid"`
 	Title  string `json:"title"`
 	Author string `json:"author"`
-	LRC    string `json:"lrc"`
-	URL    string `json:"url"`
-	Pic    string `json:"pic"`
+	//LRC    string `json:"lrc"`
+	URL string `json:"url"`
+	Pic string `json:"pic"`
 }
 
 func getMusicAudioData(musicName string) ([]byte, string, string, error) {
@@ -291,7 +291,7 @@ func GetMusicUrlByName(musicName string) (string, string, error) {
 		},
 	}
 
-	sourceType := "xmsj"
+	sourceType := "txqq"
 
 	sourceInfo := sourceMap[sourceType]
 

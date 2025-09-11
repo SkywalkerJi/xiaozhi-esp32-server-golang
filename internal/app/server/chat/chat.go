@@ -2,7 +2,9 @@ package chat
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -58,6 +60,10 @@ func NewChatManager(deviceID string, transport types_conn.IConn, options ...Chat
 		clientState,
 		serverTransport,
 	)
+
+	if IsKeepaliveClient(cm.DeviceID) {
+		go cm.keepaliveLoop()
+	}
 
 	return cm, nil
 }
@@ -162,7 +168,9 @@ func (c *ChatManager) Close() error {
 	}
 
 	// 最后取消管理器级别的上下文
-	c.cancel()
+	if !IsKeepaliveClient(c.clientState.DeviceID) {
+		c.cancel()
+	}
 
 	return nil
 }
@@ -189,5 +197,23 @@ func (c *ChatManager) InjectMessage(message string, skipLlm bool) error {
 	} else {
 		// 通过LLM处理消息
 		return c.session.AddAsrResultToQueue(message)
+	}
+}
+
+func (c *ChatManager) keepaliveLoop() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	data := map[string]interface{}{
+		"type": "keepalive",
+	}
+	bodyBytes, _ := json.Marshal(data)
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-ticker.C:
+			log.Infof("发送保活消息到设备 %s", c.clientState.DeviceID)
+			c.transport.SendCmd(bodyBytes)
+		}
 	}
 }

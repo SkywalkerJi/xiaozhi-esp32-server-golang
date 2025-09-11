@@ -664,11 +664,15 @@ func (s *ChatSession) Close() {
 
 	// 关闭服务端传输
 	if s.serverTransport != nil {
-		s.serverTransport.Close()
+		if !IsKeepaliveClient(s.clientState.DeviceID) {
+			s.serverTransport.Close()
+		}
 	}
 
 	// 取消会话级别的上下文
-	s.cancel()
+	if !IsKeepaliveClient(s.clientState.DeviceID) {
+		s.cancel()
+	}
 
 	log.Debugf("ChatSession.Close() 会话资源清理完成, 设备 %s", s.clientState.DeviceID)
 }

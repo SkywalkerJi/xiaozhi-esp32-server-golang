@@ -32,3 +32,11 @@ func isWakeupWord(text string) bool {
 	}
 	return false
 }
+
+func IsKeepaliveClient(clientID string) bool {
+	keepaliveClients := viper.GetStringMap("keepalive_client")
+	if _, ok := keepaliveClients[clientID]; ok {
+		return true
+	}
+	return false
+}

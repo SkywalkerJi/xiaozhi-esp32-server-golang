@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"xiaozhi-esp32-server-golang/logger"
@@ -13,22 +12,20 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
+	cmap "github.com/orcaman/concurrent-map/v2"
 )
 
 // DeviceMcpSession 代表一个设备的MCP会话，聚合了多种MCP连接
 type DeviceMcpSession struct {
-	lock          sync.RWMutex
 	deviceID      string
 	Ctx           context.Context
 	cancel        context.CancelFunc
-	wsEndPointMcp map[string]*McpClientInstance
+	wsEndPointMcp cmap.ConcurrentMap[string, *McpClientInstance]
 	iotOverMcp    *McpClientInstance
 }
 
 func (dcs *DeviceMcpSession) AddWsEndPointMcp(mcpClient *McpClientInstance) {
-	dcs.lock.Lock()
-	defer dcs.lock.Unlock()
-	dcs.wsEndPointMcp[mcpClient.serverName] = mcpClient
+	dcs.wsEndPointMcp.Set(mcpClient.serverName, mcpClient)
 
 	// 设置关闭回调
 	mcpClient.SetOnCloseHandler(dcs.handleMcpClientClose)
@@ -47,9 +44,7 @@ func (dcs *DeviceMcpSession) SetIotOverMcp(mcpClient *McpClientInstance) {
 }
 
 func (dcs *DeviceMcpSession) RemoveWsEndPointMcp(mcpClient *McpClientInstance) {
-	dcs.lock.Lock()
-	defer dcs.lock.Unlock()
-	delete(dcs.wsEndPointMcp, mcpClient.serverName)
+	dcs.wsEndPointMcp.Remove(mcpClient.serverName)
 }
 
 // GetDeviceID 获取设备ID
@@ -65,7 +60,7 @@ func (dcs *DeviceMcpSession) handleMcpClientClose(instance *McpClientInstance, r
 	dcs.RemoveWsEndPointMcp(instance)
 
 	// 如果所有WebSocket端点都关闭了，可以考虑清理整个会话
-	/*if len(dcs.wsEndPointMcp) == 0 && dcs.iotOverMcp == nil {
+	/*if dcs.wsEndPointMcp.Count() == 0 && dcs.iotOverMcp == nil {
 		logger.Infof("设备 %s 的所有MCP连接已关闭，清理会话", dcs.deviceID)
 		dcs.cancel()
 	}*/
@@ -75,8 +70,7 @@ func (dcs *DeviceMcpSession) handleMcpClientClose(instance *McpClientInstance, r
 type McpClientInstance struct {
 	serverName string
 	mcpClient  *client.Client // 是从ws endpoint连上来的mcp server
-	tools      map[string]tool.InvokableTool
-	toolsMux   sync.RWMutex // 保护工具列表的互斥锁
+	tools      cmap.ConcurrentMap[string, tool.InvokableTool]
 	serverInfo *mcp.InitializeResult
 	lastPing   time.Time
 	Ctx        context.Context
@@ -96,7 +90,7 @@ func NewDeviceMCPSession(deviceID string) *DeviceMcpSession {
 		deviceID:      deviceID,
 		Ctx:           ctx,
 		cancel:        cancel,
-		wsEndPointMcp: make(map[string]*McpClientInstance),
+		wsEndPointMcp: cmap.New[*McpClientInstance](),
 	}
 
 	go deviceMcpClient.refreshToolsAndPing()
@@ -117,7 +111,7 @@ func NewWsEndPointMcpClient(ctx context.Context, deviceID string, conn *websocke
 	wsEndPointMcp := &McpClientInstance{
 		serverName: fmt.Sprintf("ws_endpoint_mcp_%s_%s", deviceID, conn.RemoteAddr().String()),
 		mcpClient:  mcpClient,
-		tools:      make(map[string]tool.InvokableTool),
+		tools:      cmap.New[tool.InvokableTool](),
 		Ctx:        ctx,
 		cancel:     cancel,
 		connected:  true,
@@ -146,7 +140,7 @@ func NewIotOverMcpClient(deviceID string, conn ConnInterface) *McpClientInstance
 	iotOverMcp := &McpClientInstance{
 		serverName: fmt.Sprintf("iot_over_mcp_%s", deviceID),
 		mcpClient:  mcpClient,
-		tools:      make(map[string]tool.InvokableTool),
+		tools:      cmap.New[tool.InvokableTool](),
 		Ctx:        ctx,
 		cancel:     cancel,
 		connected:  true,
@@ -171,12 +165,13 @@ func (dc *McpClientInstance) refreshTools() error {
 		return err
 	}
 
-	// 使用互斥锁保护工具列表的更新
-	dc.toolsMux.Lock()
-	dc.tools = ConvertMcpToolListToInvokableToolList(tools.Tools, dc.serverName, dc.mcpClient)
-	dc.toolsMux.Unlock()
+	// 清空现有工具并添加新工具
+	dc.tools.Clear()
+	for name, tool := range ConvertMcpToolListToInvokableToolList(tools.Tools, dc.serverName, dc.mcpClient) {
+		dc.tools.Set(name, tool)
+	}
 
-	logger.Infof("刷新工具列表成功: %s 获取到 %d 个工具", dc.serverName, len(dc.tools))
+	logger.Infof("刷新工具列表成功: %s 获取到 %d 个工具", dc.serverName, dc.tools.Count())
 	return nil
 }
 
@@ -207,11 +202,9 @@ func (dc *DeviceMcpSession) refreshToolsAndPing() {
 	}
 
 	// 初始化时获取工具列表
-	dc.lock.RLock()
-	for _, mcpInstance := range dc.wsEndPointMcp {
+	for _, mcpInstance := range dc.wsEndPointMcp.Items() {
 		findTools(mcpInstance)
 	}
-	dc.lock.RUnlock()
 	findTools(dc.iotOverMcp)
 
 	// 每2分钟进行一次ping
@@ -224,11 +217,9 @@ func (dc *DeviceMcpSession) refreshToolsAndPing() {
 			logger.Infof("设备 %s 会话已取消，停止ping", dc.deviceID)
 			return
 		case <-pingTick.C:
-			dc.lock.RLock()
-			for _, mcpInstance := range dc.wsEndPointMcp {
+			for _, mcpInstance := range dc.wsEndPointMcp.Items() {
 				ping(mcpInstance)
 			}
-			dc.lock.RUnlock()
 			//ping(dc.iotOverMcp)
 		}
 	}
@@ -323,9 +314,7 @@ func (dc *McpClientInstance) IsConnected() bool {
 
 // GetConnectionStatus 获取连接状态信息
 func (dc *McpClientInstance) GetConnectionStatus() map[string]interface{} {
-	dc.toolsMux.RLock()
-	toolsCount := len(dc.tools)
-	dc.toolsMux.RUnlock()
+	toolsCount := dc.tools.Count()
 
 	return map[string]interface{}{
 		"server_name": dc.serverName,
@@ -338,58 +327,39 @@ func (dc *McpClientInstance) GetConnectionStatus() map[string]interface{} {
 // GetTools 获取工具列表
 func (dc *DeviceMcpSession) GetTools() map[string]tool.InvokableTool {
 	tools := make(map[string]tool.InvokableTool)
-	dc.lock.RLock()
-	for _, mcpInstance := range dc.wsEndPointMcp {
-		mcpInstance.toolsMux.RLock()
-		for k, v := range mcpInstance.tools {
+	for _, mcpInstance := range dc.wsEndPointMcp.Items() {
+		for k, v := range mcpInstance.tools.Items() {
 			tools[k] = v
 		}
-		mcpInstance.toolsMux.RUnlock()
 	}
-	dc.lock.RUnlock()
 	if dc.iotOverMcp != nil {
-		dc.iotOverMcp.toolsMux.RLock()
-		for k, v := range dc.iotOverMcp.tools {
+		for k, v := range dc.iotOverMcp.tools.Items() {
 			tools[k] = v
 		}
-		dc.iotOverMcp.toolsMux.RUnlock()
 	}
 	return tools
 }
 
 func (dc *DeviceMcpSession) GetWsEndpointMcpTools() map[string]tool.InvokableTool {
-	dc.lock.RLock()
-	defer dc.lock.RUnlock()
 	tools := make(map[string]tool.InvokableTool)
-	for _, mcpInstance := range dc.wsEndPointMcp {
-		mcpInstance.toolsMux.RLock()
-		for k, v := range mcpInstance.tools {
+	for _, mcpInstance := range dc.wsEndPointMcp.Items() {
+		for k, v := range mcpInstance.tools.Items() {
 			tools[k] = v
 		}
-		mcpInstance.toolsMux.RUnlock()
 	}
 	return tools
 }
 
 func (dc *DeviceMcpSession) GetToolByName(toolName string) (tool.InvokableTool, bool) {
-	dc.lock.RLock()
-	for _, mcpInstance := range dc.wsEndPointMcp {
-		mcpInstance.toolsMux.RLock()
-		if tool, ok := mcpInstance.tools[toolName]; ok {
-			mcpInstance.toolsMux.RUnlock()
-			dc.lock.RUnlock()
+	for _, mcpInstance := range dc.wsEndPointMcp.Items() {
+		if tool, ok := mcpInstance.tools.Get(toolName); ok {
 			return tool, true
 		}
-		mcpInstance.toolsMux.RUnlock()
 	}
-	dc.lock.RUnlock()
 	if dc.iotOverMcp != nil {
-		dc.iotOverMcp.toolsMux.RLock()
-		if tool, ok := dc.iotOverMcp.tools[toolName]; ok {
-			dc.iotOverMcp.toolsMux.RUnlock()
+		if tool, ok := dc.iotOverMcp.tools.Get(toolName); ok {
 			return tool, true
 		}
-		dc.iotOverMcp.toolsMux.RUnlock()
 	}
 	return nil, false
 }

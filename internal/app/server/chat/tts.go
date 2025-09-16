@@ -290,7 +290,7 @@ func (t *TTSManager) SendAudioToMetaHuman(ctx context.Context, audioChan chan []
 
 	// 音频缓冲区：积累1000ms的数据
 	// 16000采样率 * 1声道 * 1000ms = 16000个样本 = 32000字节
-	bufferSize := 16000 * 2 // 1000ms的PCM数据（每个样本2字节）
+	bufferSize := 16000 * 2 * 2 // 1000ms的PCM数据（每个样本2字节）
 	audioBuffer := make([]byte, 0, bufferSize)
 
 	// 写入缓冲区的函数
@@ -299,6 +299,19 @@ func (t *TTSManager) SendAudioToMetaHuman(ctx context.Context, audioChan chan []
 			redisClient.RPush(ctx, queueKey, audioBuffer)
 			log.Debugf("写入Redis音频数据: %d 字节", len(audioBuffer))
 			audioBuffer = audioBuffer[:0] // 清空缓冲区
+		}
+	}
+
+	// 写入严格2000ms数据的函数
+	writeExactBuffer := func() {
+		if len(audioBuffer) >= bufferSize {
+			// 只写入严格1000ms的数据
+			dataToWrite := audioBuffer[:bufferSize]
+			redisClient.RPush(ctx, queueKey, dataToWrite)
+			log.Debugf("写入Redis音频数据: %d 字节 (严格1000ms)", len(dataToWrite))
+
+			// 保留剩余数据在缓冲区中
+			audioBuffer = audioBuffer[bufferSize:]
 		}
 	}
 
@@ -328,9 +341,9 @@ func (t *TTSManager) SendAudioToMetaHuman(ctx context.Context, audioChan chan []
 			// 将PCM数据添加到缓冲区
 			audioBuffer = append(audioBuffer, pcmBytes...)
 
-			// 当缓冲区积累到1000ms数据时，写入Redis
+			// 当缓冲区积累到1000ms数据时，写入Redis（严格1000ms，剩余数据保留）
 			if len(audioBuffer) >= bufferSize {
-				writeBuffer()
+				writeExactBuffer()
 			}
 		}
 	}

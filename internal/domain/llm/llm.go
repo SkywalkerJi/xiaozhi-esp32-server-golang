@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"time"
 	"unicode"
 	"xiaozhi-esp32-server-golang/internal/domain/llm/common"
 
@@ -48,8 +47,6 @@ func HandleLLMWithContextAndTools(ctx context.Context, llmProvider LLMProvider, 
 	llmResponse = llmProvider.ResponseWithContext(ctx, sessionID, dialogue, tools)
 
 	sentenceChannel := make(chan common.LLMResponseStruct, 2)
-	startTs := time.Now().UnixMilli()
-	var firstFrame bool
 	fullText := ""
 	var buffer bytes.Buffer // 用于累积接收到的内容
 	isFirst := true
@@ -104,40 +101,15 @@ func HandleLLMWithContextAndTools(ctx context.Context, llmProvider LLMProvider, 
 				byteMessage, _ := json.Marshal(message)
 				log.Infof("收到message: %s", string(byteMessage))
 				if message.Content != "" {
-					fullText += message.Content
-					buffer.WriteString(message.Content)
-					if containsSentenceSeparator(message.Content, isFirst) {
-						sentences, remaining := extractSmartSentences(buffer.String(), 2, 100, isFirst)
-						if len(sentences) > 0 {
-							for _, sentence := range sentences {
-								if sentence != "" {
-									if !firstFrame {
-										firstFrame = true
-										log.Infof("耗时统计: llm工具首句: %d ms", time.Now().UnixMilli()-startTs)
-									}
-									log.Infof("处理完整句子: %s", sentence)
-									select {
-									case <-ctx.Done():
-										log.Infof("上下文已取消，停止LLM响应处理: %v, context done, exit", ctx.Err())
-										return
-									case sentenceChannel <- common.LLMResponseStruct{
-										Text:    sentence,
-										IsStart: isFirst,
-										IsEnd:   false,
-									}:
-									}
-
-									if isFirst {
-										isFirst = false
-									}
-								}
-							}
-						}
-						buffer.Reset()
-						buffer.WriteString(remaining)
-						if isFirst {
-							isFirst = false
-						}
+					select {
+					case <-ctx.Done():
+						log.Infof("上下文已取消，停止LLM响应处理: %v, context done, exit", ctx.Err())
+						return
+					case sentenceChannel <- common.LLMResponseStruct{
+						Text:    message.Content,
+						IsStart: isFirst,
+						IsEnd:   false,
+					}:
 					}
 				}
 				// 工具调用响应（假设 ToolCalls 字段）

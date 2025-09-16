@@ -159,8 +159,8 @@ func (l *LLMManager) HandleLLMResponseChannelSync(ctx context.Context, userMessa
 	suffix := time.Now().UnixNano()
 	queueKey := "DHQA_AUDIO_QUEUE"
 
-	startKey := fmt.Sprintf("%s%d", "##AUDIO START##", suffix)
-	endKey := fmt.Sprintf("%s%d", "##AUDIO END##", suffix)
+	startKey := fmt.Sprintf("%s%d", "##AUDIO_START##", suffix)
+	endKey := fmt.Sprintf("%s%d", "##AUDIO_END##", suffix)
 
 	if needSendTtsCmd {
 		l.serverTransport.SendTtsStart()

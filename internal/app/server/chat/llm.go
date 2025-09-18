@@ -164,12 +164,12 @@ func (l *LLMManager) HandleLLMResponseChannelSync(ctx context.Context, userMessa
 
 	if needSendTtsCmd {
 		l.serverTransport.SendTtsStart()
-		redisClient.RPush(ctx, queueKey, []byte(startKey))
+		redisClient.RPush(context.Background(), queueKey, []byte(startKey))
 	}
 	ok, err := l.handleLLMResponse(ctx, userMessage, llmResponseChannel)
 	if needSendTtsCmd {
 		l.serverTransport.SendTtsStop()
-		redisClient.RPush(ctx, queueKey, []byte(endKey))
+		redisClient.RPush(context.Background(), queueKey, []byte(endKey))
 	}
 
 	return ok, err

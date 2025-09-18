@@ -166,28 +166,31 @@ func (t *TTSManager) SendTTSAudio(ctx context.Context, audioChan chan []byte, is
 	// 启动数字人音频处理协程
 	metaAudioChan := make(chan []byte, 1000)
 	go t.SendAudioToMetaHuman(ctx, metaAudioChan, &wg)
-	defer func() {
-		close(metaAudioChan)
-	}()
 
 	// 启动流控处理协程
 	go t.processFlowControl(ctx, flowControlChan, cacheFrameCount, isStart, &isStatistic, &totalFrames, &wg)
-	defer func() {
-		close(flowControlChan)
-	}()
 
 	log.Debugf("SendTTSAudio 开始，缓存帧数: %d", cacheFrameCount)
 
-	defer wg.Wait()
 	// 主循环：立即分发数据，不进行流控等待
 	for {
 		select {
 		case <-ctx.Done():
 			log.Debugf("SendTTSAudio context done, exit")
+			// 关闭通道，让goroutine知道没有更多数据
+			close(metaAudioChan)
+			close(flowControlChan)
+			// 等待所有goroutine完成
+			wg.Wait()
 			return nil
 		case frame, ok := <-audioChan:
 			if !ok {
 				log.Debugf("SendTTSAudio audioChan closed, exit")
+				// 关闭通道，让goroutine知道没有更多数据
+				close(metaAudioChan)
+				close(flowControlChan)
+				// 等待所有goroutine完成
+				wg.Wait()
 				return nil
 			}
 

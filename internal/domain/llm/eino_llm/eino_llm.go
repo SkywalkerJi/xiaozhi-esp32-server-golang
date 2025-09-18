@@ -99,7 +99,7 @@ func NewEinoLLMProvider(config map[string]interface{}) (*EinoLLMProvider, error)
 		maxTokens = mt
 	}
 
-	streamable := false
+	streamable := true
 	if s, ok := config["streamable"].(bool); ok {
 		streamable = s
 	}

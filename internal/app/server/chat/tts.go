@@ -220,6 +220,8 @@ func (t *TTSManager) SendTTSAudio(ctx context.Context, audioChan chan []byte, is
 func (t *TTSManager) processFlowControl(ctx context.Context, flowControlChan chan []byte, cacheFrameCount int, isStart bool, isStatistic *bool, totalFrames *int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
+	return
+
 	// 记录开始发送的时间戳
 	startTime := time.Now()
 

@@ -130,6 +130,14 @@ asr:
 # 文本转语音（TTS）配置
 tts:
   provider: "doubao_ws"  # TTS提供商：xiaozhi/doubao/doubao_ws/cosyvoice/edge/edge_offline
+  openai:  #openai兼容格式的tts服务, 这里使用硅基流动服务
+    api_key: "xxxx" #apikey
+    api_url: "https://api.siliconflow.cn/v1/audio/speech"
+    model: "FunAudioLLM/CosyVoice2-0.5B"
+    voice: "FunAudioLLM/CosyVoice2-0.5B:alex"
+    response_format: "mp3"
+    speed: 1.0
+    stream: true
   # 豆包TTS配置（HTTP方式）
   doubao: #基本废掉，不支持流式
     appid: "6886011847"                  # 应用ID

@@ -85,14 +85,14 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 	// 创建chatModel节点
 	chatModel := s.clientState.LLMProvider
 
-	// 创建llmSentence节点/
+	// 创建llmSentence节点
 	llmSentenceNode := compose.TransformableLambda(stream_sentence.HandleLLMWithContextAndTools)
 
 	// 创建tts节点
 	ttsNode := compose.TransformableLambda(s.createTtsTransform())
 
 	// tts2client 节点：直接使用 s.ttsManager.EinoTtsComponents
-	tts2ClientNode := compose.TransformableLambda(s.ttsManager.EinoTtsComponents)
+	tts2ClientNode := compose.CollectableLambda(s.ttsManager.EinoTtsComponents)
 
 	// 获取工具并转换为两种格式：Eino ToolInfo 和 BaseTool
 	einoTools, toolsList, err := s.getEinoTools(ctx)
@@ -121,8 +121,6 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 
 	// 创建 toolCallResult 节点（使用 StreamableLambda 适配 []*schema.Message 输入）
 	toolCallResultNode := compose.StreamableLambda(s.toolCallResultTransform)
-	// 创建 merge 节点（使用 CollectableLambda 将流式输入收集为 []*schema.Message 输出）
-	mergeNode := compose.CollectableLambda(s.mergeTransform)
 
 	// 添加节点到图
 	_ = graph.AddChatTemplateNode(eino.NodeChatTemplate, chatTemplateNode, compose.WithNodeName(eino.NodeChatTemplate))
@@ -180,14 +178,13 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 		eino.NodeToolCall,
 		toolsNode,
 		compose.WithNodeName(eino.NodeToolCall),
-		compose.WithStatePostHandler(func(ctx context.Context, output []*schema.Message, state *graphState) ([]*schema.Message, error) {
+		/*compose.WithStatePostHandler(func(ctx context.Context, output []*schema.Message, state *graphState) ([]*schema.Message, error) {
 			// 将输出消息添加到历史记录
 			state.history = append(state.history, output...)
 			return output, nil
-		}),
+		}),*/
 	)
 	_ = graph.AddLambdaNode(eino.NodeToolCallResult, toolCallResultNode, compose.WithNodeName(eino.NodeToolCallResult))
-	_ = graph.AddLambdaNode(eino.NodeMerge, mergeNode, compose.WithNodeName(eino.NodeMerge))
 
 	// 构建边关系
 	_ = graph.AddEdge(compose.START, eino.NodeChatTemplate)
@@ -196,16 +193,14 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 	// llm(输入非流式，输出流式) => llm_sentence, 由分散的流式消息合并为 流式输出完整句子
 	_ = graph.AddEdge(eino.NodeLLM, eino.NodeLLMSentence)
 
-	//LLMSentence节点是LLM的下游有两个 1. tts => tts2client => node merge 2. tool call => tool_call_result => node merge , 其中2和3的输出需要路由到Merge节点
+	//LLMSentence节点是LLM的下游有两个 1. tts => tts2client  2. tool call => tool_call_result => node merge , 其中2和3的输出需要路由到Merge节点
 	//llm_sentence => tts => tts2client
 	_ = graph.AddEdge(eino.NodeLLMSentence, eino.NodeTTS)
 	_ = graph.AddEdge(eino.NodeTTS, eino.NodeTTS2Client)
-	_ = graph.AddEdge(eino.NodeTTS2Client, eino.NodeMerge)
 
 	//llm_sentence => node tool call => result => merge
 	_ = graph.AddEdge(eino.NodeLLMSentence, eino.NodeToolCall)
 	_ = graph.AddEdge(eino.NodeToolCall, eino.NodeToolCallResult)
-	_ = graph.AddEdge(eino.NodeToolCallResult, eino.NodeMerge)
 
 	// 创建分支节点（使用 NewGraphBranch 因为输入是非流式的 []*schema.Message）
 	// 注意：branch 节点会根据条件动态路由到目标节点（包括 compose.END）
@@ -215,7 +210,7 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 		compose.END:  true,
 	})
 	// merge 节点接收来自 TTS2Client 和 ToolCallResult 的输出，然后连接到 Branch
-	_ = graph.AddBranch(eino.NodeMerge, branch)
+	_ = graph.AddBranch(eino.NodeToolCallResult, branch)
 
 	// 编译图
 	r, err := graph.Compile(ctx)
@@ -360,7 +355,7 @@ func (s *ChatSession) toolCallResultTransform(ctx context.Context, input []*sche
 	return outputReader, nil
 }
 
-// mergeTransform 合并 tts2client 和 tool_call 的输出
+// mergeCollect 合并 llmsentence 和 tool_call 的输出
 // 输入：*schema.StreamReader[*schema.Message]（流式消息）
 // 输出：[]*schema.Message（消息列表，供 LLM 节点使用）
 func (s *ChatSession) mergeTransform(ctx context.Context, input *schema.StreamReader[*schema.Message]) ([]*schema.Message, error) {

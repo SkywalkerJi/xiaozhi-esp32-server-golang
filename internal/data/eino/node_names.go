@@ -26,9 +26,15 @@ const (
 	// NodeMerge 合并节点名称
 	NodeMerge = "merge"
 
-	// NodePassThrough1 透传节点1名称
-	NodePassThrough1 = "pass_through_1"
+	// NodeLLMSentenceCollect LLM句子收集节点名称（将流式输出转换为非流式数组）
+	NodeLLMSentenceCollect = "llm_sentence_collect"
 
 	// NodePassThrough2 透传节点2名称
 	NodePassThrough2 = "pass_through_2"
+
+	// NodeVAD VAD 节点名称
+	NodeVAD = "vad"
+
+	// NodeASR ASR 节点名称
+	NodeASR = "asr"
 )

@@ -46,8 +46,8 @@ func (a *ASRManager) ProcessVadAudio(
 	onClose := vadOpts.OnClose
 
 	outputReader, outputWriter := schema.Pipe[[]float32](100)
-	defer outputWriter.Close()
 	go func() {
+		defer outputWriter.Close()
 		audioFormat := state.InputAudioFormat
 		audioProcesser, err := audio.GetAudioProcesser(audioFormat.SampleRate, audioFormat.Channels, audioFormat.FrameDuration)
 		if err != nil {
@@ -184,7 +184,11 @@ func (a *ASRManager) ProcessVadAudio(
 				//vad识别成功, 往asr音频通道里发送数据
 				//log.Infof("vad识别成功, 往asr音频通道里发送数据, len: %d", len(pcmData))
 				//state.Asr.AddAudioData(pcmData)
-				outputWriter.Send(pcmData, nil)
+				closed := outputWriter.Send(pcmData, nil)
+				if closed {
+					log.Errorf("asr音频通道已关闭, 停止发送数据")
+					return
+				}
 			}
 
 			//已经有语音了, 但本次没有检测到语音, 则需要判断是否已经停止说话
@@ -194,7 +198,7 @@ func (a *ASRManager) ProcessVadAudio(
 				idleDuration := state.Vad.GetIdleDuration()
 				if state.IsSilence(idleDuration) { //从有声音到 静默的判断
 					state.OnVoiceSilence()
-					continue
+					return
 				}
 			}
 		}
@@ -203,7 +207,7 @@ func (a *ASRManager) ProcessVadAudio(
 }
 
 // restartAsrRecognition 重启ASR识别
-func (a *ASRManager) RestartAsrRecognition(ctx context.Context) error {
+func (a *ASRManager) RestartAsrRecognition(ctx context.Context, audioStream *schema.StreamReader[[]float32]) error {
 	state := a.clientState
 	log.Debugf("重启ASR识别开始")
 
@@ -227,7 +231,7 @@ func (a *ASRManager) RestartAsrRecognition(ctx context.Context) error {
 	state.Asr.AsrAudioChannel = make(chan []float32, 100)
 
 	// 重新启动流式识别
-	asrResultChannel, err := state.AsrProvider.StreamingRecognize(state.Asr.Ctx, state.Asr.AsrAudioChannel)
+	asrResultChannel, err := state.AsrProvider.StreamingRecognize(state.Asr.Ctx, audioStream)
 	if err != nil {
 		log.Errorf("重启ASR流式识别失败: %v", err)
 		return fmt.Errorf("重启ASR流式识别失败: %v", err)

@@ -10,14 +10,17 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	"github.com/spf13/viper"
+
+	"xiaozhi-esp32-server-golang/internal/data/eino"
+	vad_types "xiaozhi-esp32-server-golang/internal/data/vad"
 
 	"xiaozhi-esp32-server-golang/internal/app/server/auth"
 	types_conn "xiaozhi-esp32-server-golang/internal/app/server/types"
 	. "xiaozhi-esp32-server-golang/internal/data/client"
 	. "xiaozhi-esp32-server-golang/internal/data/msg"
-	vad_types "xiaozhi-esp32-server-golang/internal/data/vad"
 	user_config "xiaozhi-esp32-server-golang/internal/domain/config"
 	"xiaozhi-esp32-server-golang/internal/domain/eventbus"
 	"xiaozhi-esp32-server-golang/internal/domain/llm"
@@ -300,7 +303,7 @@ func (s *ChatSession) HandleCommonHelloMessage(msg *ClientMessage) error {
 	clientState.SetAsrPcmFrameSize(clientState.InputAudioFormat.SampleRate, clientState.InputAudioFormat.Channels, clientState.InputAudioFormat.FrameDuration)
 
 	//start vad audio process
-	s.asrManager.ProcessVadAudio(s.ctx, s.clientState.OpusAudioBufferReader, vad_types.WithOnClose(s.Close))
+	//s.asrManager.ProcessVadAudio(s.ctx, s.clientState.OpusAudioBufferReader, vad_types.WithOnClose(s.Close))
 
 	return nil
 }
@@ -555,21 +558,86 @@ func (s *ChatSession) OnListenStart() error {
 	s.clientState.Destroy()
 
 	ctx := s.clientState.SessionCtx.Get(s.clientState.Ctx)
+	_ = ctx
 
 	//初始化asr相关
 	if s.clientState.ListenMode == "manual" {
 		s.clientState.VoiceStatus.SetClientHaveVoice(true)
 	}
 
-	//在这里开始eino编排, todo
+	//在这里开始eino编排
+	err := s.RunVadAsrGraph(ctx)
+	if err != nil {
+		log.Errorf("执行VAD+ASR graph失败: %v", err)
+		return err
+	}
 
 	return nil
 }
 
-func (s *ChatSession) EinoAsrComponent(ctx context.Context, input *schema.StreamReader[[]float32]) (string, error) {
+// CreateVadAsrGraph 创建VAD+ASR的eino graph
+func (s *ChatSession) CreateVadAsrGraph(ctx context.Context) (compose.Runnable[[]byte, string], error) {
+	// 创建图，输入是 []byte（opus音频），输出是 string（ASR识别结果）
+	// 注意：Graph 的类型参数应该是非流式类型，使用 Collect 方法时传入流式输入
+	graph := compose.NewGraph[[]byte, string]()
+
+	// 创建VAD节点：将 opus 音频转换为 PCM 音频
+	// 需要将非流式输入转换为流式输入，然后调用 ProcessVadAudio
+	vadNode := compose.TransformableLambda(func(ctx context.Context, input *schema.StreamReader[[]byte]) (*schema.StreamReader[[]float32], error) {
+		return s.asrManager.ProcessVadAudio(ctx, input, vad_types.WithOnClose(s.Close))
+	})
+
+	// 创建ASR节点：将 PCM 音频转换为文本
+	// 使用 CollectableLambda 因为 EinoAsrComponent 返回非流式的 string
+	asrNode := compose.CollectableLambda(s.EinoAsrComponent)
+
+	// 添加节点到图
+	_ = graph.AddLambdaNode(eino.NodeVAD, vadNode, compose.WithNodeName(eino.NodeVAD))
+	_ = graph.AddLambdaNode(eino.NodeASR, asrNode, compose.WithNodeName(eino.NodeASR))
+
+	// 构建边关系：START -> VAD -> ASR -> END
+	// 注意：START 节点输出 []byte，但 VAD 节点需要 *schema.StreamReader[[]byte]
+	// eino 框架会自动处理这种转换
+	_ = graph.AddEdge(compose.START, eino.NodeVAD)
+	_ = graph.AddEdge(eino.NodeVAD, eino.NodeASR)
+	_ = graph.AddEdge(eino.NodeASR, compose.END)
+
+	// 编译图
+	r, err := graph.Compile(ctx)
+	if err != nil {
+		log.Errorf("编译VAD+ASR Graph失败: %v", err)
+		return nil, err
+	}
+
+	return r, nil
+}
+
+// RunVadAsrGraph 执行VAD+ASR的eino graph
+func (s *ChatSession) RunVadAsrGraph(ctx context.Context) error {
+	g, err := s.CreateVadAsrGraph(ctx)
+	if err != nil {
+		log.Errorf("创建VAD+ASR Graph失败: %v", err)
+		return err
+	}
+
+	// 执行图，输入是 OpusAudioBufferReader，使用 Collect 方法处理流式输入并返回非流式输出
+	// Collect 是阻塞的，会一直等待直到流结束并返回最终结果
+	text, err := g.Collect(ctx, s.clientState.OpusAudioBufferReader)
+	if err != nil {
+		log.Errorf("执行VAD+ASR Graph失败: %v", err)
+		return err
+	}
+	if text != "" {
+		log.Debugf("VAD+ASR Graph识别结果: %s", text)
+	}
+
+	return nil
+}
+
+func (s *ChatSession) EinoAsrComponent(ctx context.Context, audioStream *schema.StreamReader[[]float32]) (string, error) {
 
 	// 启动asr流式识别，复用 restartAsrRecognition 函数
-	err := s.asrManager.RestartAsrRecognition(ctx)
+	err := s.asrManager.RestartAsrRecognition(ctx, audioStream)
 	if err != nil {
 		log.Errorf("asr流式识别失败: %v", err)
 		s.Close()
@@ -636,7 +704,7 @@ func (s *ChatSession) EinoAsrComponent(ctx context.Context, input *schema.Stream
 				return "", err
 			}
 			if s.clientState.IsRealTime() {
-				if restartErr := s.asrManager.RestartAsrRecognition(ctx); restartErr != nil {
+				if restartErr := s.asrManager.RestartAsrRecognition(ctx, audioStream); restartErr != nil {
 					log.Errorf("重启ASR识别失败: %v", restartErr)
 					s.Close()
 					return "", restartErr
@@ -658,7 +726,7 @@ func (s *ChatSession) EinoAsrComponent(ctx context.Context, input *schema.Stream
 				diffTs := time.Now().Unix() - startIdleTime
 				if startIdleTime > 0 && diffTs <= maxIdleTime {
 					log.Warnf("ASR识别结果为空，尝试重启ASR识别, diff ts: %s", diffTs)
-					if restartErr := s.asrManager.RestartAsrRecognition(ctx); restartErr != nil {
+					if restartErr := s.asrManager.RestartAsrRecognition(ctx, audioStream); restartErr != nil {
 						log.Errorf("重启ASR识别失败: %v", restartErr)
 						s.Close()
 						return "", restartErr

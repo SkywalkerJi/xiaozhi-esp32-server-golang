@@ -19,57 +19,55 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
+type EinoGraphDef compose.Runnable[map[string]any, []*schema.Message]
+
 // graphState 用于在图中存储历史消息状态
 type graphState struct {
 	history []*schema.Message
 }
 
-// RunEinoGraph 执行 Eino 图，处理对话流程
-//
-// 图的依赖关系和执行流程：
-//
-//	START
-//	  ↓
-//	ChatTemplate (将用户输入转换为模板消息)
-//	  ↓
-//	LLM (调用大语言模型，可能返回文本或工具调用)
-//	  ↓
-//	LLMSentence (将 LLM 响应按句子分割)
-//	  ├─→ TTS (文本转语音)
-//	  │     ↓
-//	  │   TTS2Client (发送音频到客户端)
-//	  │     ↓
-//	  │   Merge ───┐
-//	  │            │
-//	  └─→ [条件分支: toolCallBranch] (在流式输入中检查是否有工具调用)
-//	        ├─ 有工具调用 → tool_call (执行工具)
-//	        │                  ↓
-//	        │              tool_call_result (处理工具调用结果)
-//	        │                  ↓
-//	        │              Merge ───┘
-//	        │
-//	        └─ 无工具调用 → Merge (直接合并，跳过工具调用处理)
-//	                             ↓
-//	                          [条件分支: branch]
-//	                             ├─ 有工具调用或工具结果 → LLM (继续对话，形成循环)
-//	                             └─ 无工具调用或工具结果 → END (结束)
-//
-// 关键节点说明：
-//   - ChatTemplate: 将用户输入转换为模板格式
-//   - LLM: 大语言模型节点，可能返回文本内容或工具调用请求
-//   - LLMSentence: 将 LLM 响应按句子分割，便于实时处理
-//   - TTS: 文本转语音节点
-//   - toolCallBranch: 条件分支，在流式输入中检查是否有工具调用
-//   - tool_call: 执行工具调用（仅当检测到工具调用时）
-//   - tool_call_result: 处理工具调用结果，支持特殊标记（如 [STOP]）
-//   - Merge: 合并 TTS 和工具调用结果的输出
-//   - branch: 根据是否有工具调用或工具结果，决定是否继续循环或结束
-//
-// 循环机制：
-//
-//	当检测到工具调用或工具结果时，会通过 branch 节点返回到 LLM 节点，
-//	形成循环，直到没有工具调用或工具结果时结束。
 func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
+	g, err := s.CreateLlmTtsGraph(ctx)
+	if err != nil {
+		log.Errorf("创建EinoGraph失败: %v", err)
+		return err
+	}
+
+	// 输入改为 map[string]any，对应 chatTemplate 的占位符
+	inputData := s.llmManager.GetTemplateVariables(ctx, &schema.Message{
+		Role:    schema.User,
+		Content: text,
+	}, 20)
+
+	handler := s.GetEinoCallbackHandle()
+
+	// 执行图，使用状态修改器初始化历史消息
+	streamReader, err := g.Stream(
+		ctx,
+		inputData,
+		compose.WithCallbacks(handler),
+	)
+	if err != nil {
+		log.Errorf("执行EinoGraph失败: %v", err)
+		return err
+	}
+	for {
+		msgs, err := streamReader.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Errorf("读取EinoGraph结果失败: %v", err)
+			return err
+		}
+		for _, msg := range msgs {
+			log.Debugf("EinoGraph结果: %+v", msg)
+		}
+	}
+	return nil
+}
+
+func (s *ChatSession) CreateLlmTtsGraph(ctx context.Context) (EinoGraphDef, error) {
 	// 创建图，并设置本地状态生成函数
 	// 输入类型改为 map[string]any，对应 chatTemplate 的占位符
 	graph := compose.NewGraph[map[string]any, []*schema.Message](
@@ -105,7 +103,7 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 		chatModel, err = chatModel.WithTools(einoTools)
 		if err != nil {
 			log.Errorf("绑定工具到 chatModel 失败: %v", err)
-			return err
+			return nil, err
 		}
 		log.Infof("成功绑定 %d 个工具到 chatModel", len(einoTools))
 	}
@@ -116,7 +114,7 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 	})
 	if err != nil {
 		log.Errorf("创建 ToolsNode 失败: %v", err)
-		return err
+		return nil, err
 	}
 
 	// 创建 toolCallResult 节点
@@ -186,7 +184,10 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 	)
 	_ = graph.AddLambdaNode(eino.NodeToolCallResult, toolCallResultNode, compose.WithNodeName(eino.NodeToolCallResult))
 
-	_ = graph.AddPassthroughNode(eino.NodePassThrough1)
+	// 创建 llm_sentence 收集节点：将流式输出转换为非流式数组
+	llmSentenceCollectNode := compose.CollectableLambda(s.llmSentenceCollectHandler)
+	_ = graph.AddLambdaNode(eino.NodeLLMSentenceCollect, llmSentenceCollectNode, compose.WithNodeName(eino.NodeLLMSentenceCollect))
+
 	_ = graph.AddPassthroughNode(eino.NodePassThrough2)
 
 	// 创建分支节点（使用 NewGraphBranch 因为输入是非流式的 []*schema.Message）
@@ -198,8 +199,8 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 	})
 
 	afterLlmSentenceBranch := compose.NewStreamGraphBranch(s.afterLlmSentenceBranchCondition, map[string]bool{
-		eino.NodeToolCall:     true,
-		eino.NodePassThrough1: true,
+		eino.NodeToolCall:           true,
+		eino.NodeLLMSentenceCollect: true,
 	})
 
 	// 构建边关系
@@ -215,10 +216,11 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 	_ = graph.AddEdge(eino.NodeTTS, eino.NodeTTS2Client)
 
 	//llm_sentence => node tool call => result => merge
-	_ = graph.AddEdge(eino.NodeLLMSentence, eino.NodeToolCall)
+	//_ = graph.AddEdge(eino.NodeLLMSentence, eino.NodeToolCall)
 	_ = graph.AddEdge(eino.NodeToolCall, eino.NodeToolCallResult)
 
-	_ = graph.AddEdge(eino.NodePassThrough1, eino.NodePassThrough2)
+	// llm_sentence => llm_sentence_collect => pass_through_2 => END
+	_ = graph.AddEdge(eino.NodeLLMSentenceCollect, eino.NodePassThrough2)
 	_ = graph.AddEdge(eino.NodePassThrough2, compose.END)
 
 	// merge 节点接收来自 TTS2Client 和 ToolCallResult 的输出，然后连接到 Branch
@@ -229,47 +231,10 @@ func (s *ChatSession) RunEinoGraph(ctx context.Context, text string) error {
 	r, err := graph.Compile(ctx)
 	if err != nil {
 		log.Errorf("编译EinoGraph失败: %v", err)
-		return err
+		return nil, err
 	}
 
-	// 输入改为 map[string]any，对应 chatTemplate 的占位符
-	inputData := s.llmManager.GetTemplateVariables(ctx, &schema.Message{
-		Role:    schema.User,
-		Content: text,
-	}, 20)
-
-	handler := s.GetEinoCallbackHandle()
-
-	// 执行图，使用状态修改器初始化历史消息
-	streamReader, err := r.Stream(
-		ctx,
-		inputData,
-		compose.WithCallbacks(handler),
-	)
-	if err != nil {
-		log.Errorf("执行EinoGraph失败: %v", err)
-		return err
-	}
-
-	// 读取所有结果
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-		msg, err := streamReader.Recv()
-		if err != nil {
-			if err == io.EOF {
-				log.Debugf("EinoGraph所有节点执行完成")
-				break
-			}
-			log.Errorf("读取EinoGraph结果失败: %v", err)
-			return err
-		}
-		log.Debugf("EinoGraph结果: %+v", msg)
-	}
-	return nil
+	return r, nil
 }
 
 func (s *ChatSession) newChatTemplate(ctx context.Context) prompt.ChatTemplate {
@@ -342,6 +307,36 @@ func (s *ChatSession) toolCallResultHandler(ctx context.Context, input []*schema
 			messages = append(messages, processedMsg)
 		} else {
 			// 其他消息直接透传
+			messages = append(messages, msg)
+		}
+	}
+
+	return messages, nil
+}
+
+// llmSentenceCollectHandler 收集 llm_sentence 的流式输出，转换为非流式数组
+// 输入：*schema.StreamReader[*schema.Message]（流式消息）
+// 输出：[]*schema.Message（消息列表）
+func (s *ChatSession) llmSentenceCollectHandler(ctx context.Context, input *schema.StreamReader[*schema.Message]) ([]*schema.Message, error) {
+	var messages []*schema.Message
+
+	for {
+		select {
+		case <-ctx.Done():
+			return messages, ctx.Err()
+		default:
+		}
+
+		msg, err := input.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Errorf("llmSentenceCollectHandler 读取输入失败: %v", err)
+			return messages, err
+		}
+
+		if msg != nil {
 			messages = append(messages, msg)
 		}
 	}
@@ -457,9 +452,9 @@ func (s *ChatSession) afterLlmSentenceBranchCondition(ctx context.Context, input
 		return eino.NodeToolCall, nil
 	}
 
-	// 没有工具调用，直接路由到 Merge（跳过 tool_call 和 tool_call_result）
-	log.Debugf("没有工具调用，直接路由到 Merge")
-	return eino.NodePassThrough1, nil
+	// 没有工具调用，直接路由到收集节点（跳过 tool_call 和 tool_call_result）
+	log.Debugf("没有工具调用，直接路由到收集节点")
+	return eino.NodeLLMSentenceCollect, nil
 }
 
 // createTtsTransform 创建 TTS 转换函数
@@ -490,13 +485,11 @@ func (s *ChatSession) GetEinoCallbackHandle() callbacks.Handler {
 		return ctx
 	}
 	sendTtsStop := func(ctx context.Context) context.Context {
-		isTtsStart, ok := ctx.Value("tts_start").(bool)
-		if ok && isTtsStart {
-			// Graph 自身结束时，发送 TTS 结束信号
-			err := s.serverTransport.SendTtsStop()
-			if err != nil {
-				log.Errorf("Graph结束: 发送TTS结束信号失败: %v", err)
-			}
+		//isTtsStart, ok := ctx.Value("tts_start").(bool)
+		// Graph 自身结束时，发送 TTS 结束信号
+		err := s.serverTransport.SendTtsStop()
+		if err != nil {
+			log.Errorf("Graph结束: 发送TTS结束信号失败: %v", err)
 		}
 		return ctx
 	}
@@ -556,7 +549,6 @@ func (s *ChatSession) GetEinoCallbackHandle() callbacks.Handler {
 			log.Infof("✅ OnErrorFn 被调用: info.Name=%s, info.Component=%v, err=%v", info.Name, info.Component, err)
 			// Graph 执行出错时，也发送 TTS 结束信号
 			if info.Component == compose.ComponentOfGraph {
-				log.Errorf("   → Graph 执行出错: %v", err)
 				return sendTtsStop(ctx)
 			} else {
 				log.Errorf("   → 节点 '%s' 执行出错: %v", info.Name, err)

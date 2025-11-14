@@ -612,41 +612,38 @@ func (s *ChatSession) EinoAsrComponent(ctx context.Context, input *schema.Stream
 
 		if text != "" {
 			//如果是realtime模式下，需要停止 当前的llm和tts
-			if s.clientState.IsRealTime() {
+			if s.clientState.IsRealTime() && viper.GetInt("chat.realtime_mode") == 2 {
 				s.clientState.AfterAsrSessionCtx.Cancel()
 			}
 			// 重置重试计数器
-			startIdleTime = 0
+			startIdleTime = time.Now().Unix()
 
 			//当获取到asr结果时, 结束语音输入
 			s.clientState.OnVoiceSilence()
 
 			//发送asr消息
-			/*err = s.serverTransport.SendAsrResult(text)
+			err = s.serverTransport.SendAsrResult(text)
 			if err != nil {
 				log.Errorf("发送asr消息失败: %v", err)
 				s.Close()
 				return "", err
 			}
 
-
 			err = s.AddAsrResultToQueue(text)
 			if err != nil {
 				log.Errorf("开始对话失败: %v", err)
 				s.Close()
-				return
+				return "", err
 			}
 			if s.clientState.IsRealTime() {
 				if restartErr := s.asrManager.RestartAsrRecognition(ctx); restartErr != nil {
 					log.Errorf("重启ASR识别失败: %v", restartErr)
 					s.Close()
-					return
+					return "", restartErr
 				}
 				//realtime模式下, 继续重启asr识别
 				continue
 			}
-			return "", err
-			}*/
 			return text, nil
 		} else {
 			select {
@@ -720,7 +717,11 @@ func (s *ChatSession) ClearChatTextQueue() {
 }
 
 func (s *ChatSession) Close() {
-	log.Debugf("ChatSession.Close() 开始清理会话资源, 设备 %s", s.clientState.DeviceID)
+	deviceID := ""
+	if s.clientState != nil {
+		deviceID = s.clientState.DeviceID
+	}
+	log.Debugf("ChatSession.Close() 开始清理会话资源, 设备 %s", deviceID)
 
 	// 停止说话和清理音频相关资源
 	s.StopSpeaking(true)
@@ -736,9 +737,11 @@ func (s *ChatSession) Close() {
 	// 取消会话级别的上下文
 	s.cancel()
 
-	eventbus.Get().Publish(eventbus.TopicSessionEnd, s.clientState)
+	if s.clientState != nil {
+		eventbus.Get().Publish(eventbus.TopicSessionEnd, s.clientState)
+	}
 
-	log.Debugf("ChatSession.Close() 会话资源清理完成, 设备 %s", s.clientState.DeviceID)
+	log.Debugf("ChatSession.Close() 会话资源清理完成, 设备 %s", deviceID)
 }
 
 func (s *ChatSession) actionDoChat(ctx context.Context, text string) error {

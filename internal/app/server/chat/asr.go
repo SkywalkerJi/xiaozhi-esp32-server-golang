@@ -11,6 +11,7 @@ import (
 	log "xiaozhi-esp32-server-golang/logger"
 
 	"github.com/cloudwego/eino/schema"
+	"github.com/spf13/viper"
 )
 
 type ASRManagerOption func(*ASRManager)
@@ -156,7 +157,19 @@ func (a *ASRManager) ProcessVadAudio(
 				if !state.Asr.AutoEnd {
 					state.Vad.ResetIdleDuration()
 				}
+
+				// 累积检测到声音的时长
+				state.Vad.AddVoiceDuration(int64(audioFormat.FrameDuration))
+
+				voiceDuration := state.Vad.GetVoiceDuration()
+				log.Debugf("voiceDuration: %d", voiceDuration)
+				if state.IsRealTime() && viper.GetInt("chat.realtime_mode") == 1 && voiceDuration > 120 {
+					//realtime模式下, 如果此时有正在进行的llm和tts则取消掉
+					log.Debugf("realtime模式vad打断下 && 语音时长超过%d ms 如果此时有正在进行的llm和tts则取消掉", voiceDuration)
+					state.AfterAsrSessionCtx.Cancel()
+				}
 			} else {
+				state.Vad.ResetVoiceDuration()
 				//如果之前没有语音, 本次也没有语音, 则从缓存中删除
 				if !clientHaveVoice {
 					//保留近10帧

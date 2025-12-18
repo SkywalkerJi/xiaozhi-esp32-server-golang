@@ -186,11 +186,20 @@ func (t *TTSManager) SendTTSAudio(ctx context.Context, audioChan chan []byte, is
 				// 为确保终端播放完成：等待已发送帧的总时长与从开始发送以来的实际耗时之间的差值
 				elapsed := time.Since(startTime)
 				totalDuration := time.Duration(totalFrames) * frameDuration
+				waitDuration := time.Duration(0)
 				if totalDuration > elapsed {
-					waitDuration := totalDuration - elapsed
-					log.Debugf("SendTTSAudio 等待客户端播放剩余缓冲: %v (totalFrames=%d, frameDuration=%v)", waitDuration, totalFrames, frameDuration)
-					time.Sleep(waitDuration)
+					waitDuration = totalDuration - elapsed
 				}
+
+				// 额外等待 500ms 以补偿网络传输延迟和客户端缓冲区播放时间
+				// 避免在客户端播放完毕之前发送 stop 导致音频截断
+				extraDelay := 500 * time.Millisecond
+				totalWaitDuration := waitDuration + extraDelay
+
+				log.Debugf("SendTTSAudio 等待客户端播放完毕: 基础等待=%v, 额外延迟=%v, 总等待=%v (totalFrames=%d, frameDuration=%v)",
+					waitDuration, extraDelay, totalWaitDuration, totalFrames, frameDuration)
+				time.Sleep(totalWaitDuration)
+
 				log.Debugf("SendTTSAudio audioChan closed, exit, 总共发送 %d 帧", totalFrames)
 				return nil
 			}

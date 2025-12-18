@@ -16,12 +16,12 @@ chat:
   realtime_mode: 1 # 1: vad打断模式 2: asr打断模式
 
 config_provider:          #对应domain/config/中的provider
-  type: "manager"          #可以是 manager, redis, memory (memory模式不需要外部依赖)
+  type: "manager"         #现在可以是 manager, redis
   enable_periodic_update: true  #是否启用周期性配置更新
   update_interval: "5m"   #配置更新间隔，支持时间单位如 "5m", "1h", "30s"
 
 manager:                  #内控管理配置, 对应domain/config/manager/manager.go
-  backend_url: "http://127.0.0.1:8080" #内控地址 (Docker部署时使用8081端口)
+  backend_url: "http://127.0.0.1:8080" #内控地址
 
 # 系统提示词，定义AI助手的角色和行为
 system_prompt: |
@@ -69,12 +69,12 @@ log:
   stdout: true         # 是否输出到控制台
 
 # Redis数据库配置，用于存储设备配置及聊天历史记录，可选
-# redis:
-#   host: ""      # Redis服务器地址
-#   port:              # Redis端口
-#   password: "ticket_dev" # Redis密码
-#   db: 0                  # 使用的数据库编号
-#   key_prefix: "xiaozhi"  # 键名前缀
+redis:
+  host: "127.0.0.1"      # Redis服务器地址
+  port: 6379             # Redis端口
+  password: "ticket_dev" # Redis密码
+  db: 0                  # 使用的数据库编号
+  key_prefix: "xiaozhi"  # 键名前缀
 
 # WebSocket服务配置
 websocket:
@@ -137,7 +137,7 @@ vad:
 
 # 自动语音识别（ASR）配置
 asr:
-  provider: "doubao"  # ASR提供商：funasr 或 doubao
+  provider: "funasr"  # ASR提供商：funasr 或 doubao
   # FunASR配置
   funasr:
     host: "127.0.0.1"          # FunASR服务器地址
@@ -151,8 +151,8 @@ asr:
     auto_end: true             # 是否自动结束
   # 豆包ASR配置
   doubao:
-    appid: "4942019801"                    # 应用ID
-    access_token: "nM_0DRKUSs7C0iGDI2WN6Wo-ReJ0utmV"          # 访问令牌
+    appid: "xxx"                    # 应用ID
+    access_token: "xxx-Cu"          # 访问令牌
     ws_url: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream"  # WebSocket URL
     model_name: "bigmodel"          # 模型名称
     end_window_size: 800            # 结束窗口大小
@@ -182,10 +182,10 @@ tts:
     authorization: "Bearer;"             # 授权头
   # 豆包TTS配置（WebSocket方式），支持流式输出
   doubao_ws:
-    appid: "4942019801"                         # 应用ID
-    access_token: "nM_0DRKUSs7C0iGDI2WN6Wo-ReJ0utmV"                # 访问令牌
+    appid: "6886011847"                         # 应用ID
+    access_token: "access_token"                # 访问令牌
     cluster: "volcano_tts"                      # 集群名称
-    voice: "ICL_zh_female_chunzhenshaonv_e588402fb8ad_tob" # 语音模型
+    voice: "zh_female_wanwanxiaohe_moon_bigtts" # 语音模型
     ws_host: "openspeech.bytedance.com"         # WebSocket主机
     use_stream: true                            # 使用流式传输
   # CosyVoice TTS配置
@@ -220,7 +220,7 @@ tts:
 
 # 大语言模型（LLM）配置
 llm:
-  provider: "doubao_deepseek"  # 默认使用的LLM提供商
+  provider: "qwen_72b"  # 默认使用的LLM提供商
   # DeepSeek V3模型配置（硅基流动平台）
   deepseek:
     type: "openai"                               # 接口类型
@@ -259,10 +259,10 @@ llm:
   # 豆包DeepSeek模型配置
   doubao_deepseek:
     type: "openai"                               # 接口类型
-    model_name: "deepseek-v3-1-terminus"                    # 模型名称
-    api_key: "1b0ddfdf-0467-48ba-8ae1-365c3e70480e"                           # API密钥
+    model_name: "deepseek-v3"                    # 模型名称
+    api_key: "api_key"                           # API密钥
     base_url: "https://ark.cn-beijing.volces.com/api/v3"  # API基础地址
-    max_tokens: 8000                              # 最大生成token数
+    max_tokens: 500                              # 最大生成token数
 
 # 视觉识别配置
 vision:
@@ -292,10 +292,10 @@ ota:
   # 测试环境配置，内部测试用
   test:
     websocket:
-      url: "ws://192.168.1.5:8989/xiaozhi/v1/"  # WebSocket地址
+      url: "ws://192.168.208.214:8989/xiaozhi/v1/"  # WebSocket地址
     mqtt:
       enable: false                # 当为true时，会将 mqtt 配置给设备
-      endpoint: "192.168.1.5"  # MQTT端点，可以带端口
+      endpoint: "192.168.208.214"  # MQTT端点，可以带端口
   # 外部环境配置，线上环境用
   external:
     websocket:
@@ -308,7 +308,7 @@ ota:
 mcp:
   # 全局MCP服务器配置
   global:
-    enabled: false  # 是否启用全局MCP
+    enabled: true  # 是否启用全局MCP
     servers:
       # 文件系统MCP服务器
       - name: "filesystem"
@@ -355,9 +355,9 @@ enable_greeting: true
 
 # 欢迎语列表（随机选择）
 greeting_list:
-  - "你好，我是阿嘟，很高兴认识你。"
-  - "你好，我是阿嘟，今天有啥好玩的。"
-  - "你好，我是阿嘟，有什么需要帮助的。"
+  - "你好，我是小智，很高兴认识你。"
+  - "你好，我是小智，今天有啥好玩的。"
+  - "你好，我是小智，有什么需要帮助的。"
 
 # 唤醒词列表
 wakeup_words:

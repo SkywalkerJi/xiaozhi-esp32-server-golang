@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "dev2": "set VITE_API_TARGET=http://192.168.208.214:8080 && vite",
     "build": "vite build && cp diagnose.js dist/",
     "preview": "vite preview"

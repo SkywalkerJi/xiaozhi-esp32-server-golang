@@ -156,7 +156,7 @@ func (c *ChatSession) CmdMessageLoop(ctx context.Context) {
 		recvFailCount = 0
 		log.Infof("收到文本消息: %s", string(message))
 		if err := c.HandleTextMessage(message); err != nil {
-			log.Errorf("处理文本消息失败: %v", err)
+			log.Errorf("处理文本消息失败: %v, 原始消息: %s", err, string(message))
 			continue
 		}
 	}
@@ -244,7 +244,10 @@ func (s *ChatSession) HandleHelloMessage(msg *ClientMessage) error {
 }
 
 func (s *ChatSession) HandleMqttHelloMessage(msg *ClientMessage) error {
-	s.HandleCommonHelloMessage(msg)
+	// 检查HandleCommonHelloMessage的返回值
+	if err := s.HandleCommonHelloMessage(msg); err != nil {
+		return fmt.Errorf("处理公共hello消息失败: %v", err)
+	}
 
 	clientState := s.clientState
 
@@ -281,6 +284,8 @@ func (s *ChatSession) HandleMqttHelloMessage(msg *ClientMessage) error {
 }
 
 func (s *ChatSession) HandleCommonHelloMessage(msg *ClientMessage) error {
+	log.Infof("设备 %s 开始处理公共Hello消息", msg.DeviceID)
+
 	// 创建新会话
 	session, err := auth.A().CreateSession(msg.DeviceID)
 	if err != nil {
@@ -289,12 +294,18 @@ func (s *ChatSession) HandleCommonHelloMessage(msg *ClientMessage) error {
 
 	// 更新客户端状态
 	s.clientState.SessionID = session.ID
+	log.Infof("设备 %s 创建会话成功, SessionID: %s", msg.DeviceID, session.ID)
 
 	if isMcp, ok := msg.Features["mcp"]; ok && isMcp {
 		go initMcp(s.clientState, s.serverTransport)
 	}
 
 	clientState := s.clientState
+
+	// 检查AudioParams是否为nil，防止panic
+	if msg.AudioParams == nil {
+		return fmt.Errorf("客户端hello消息缺少audio_params字段")
+	}
 
 	clientState.InputAudioFormat = *msg.AudioParams
 	clientState.SetAsrPcmFrameSize(clientState.InputAudioFormat.SampleRate, clientState.InputAudioFormat.Channels, clientState.InputAudioFormat.FrameDuration)
@@ -305,12 +316,21 @@ func (s *ChatSession) HandleCommonHelloMessage(msg *ClientMessage) error {
 }
 
 func (s *ChatSession) HandleWebsocketHelloMessage(msg *ClientMessage) error {
+	log.Infof("设备 %s 开始处理Websocket Hello消息", msg.DeviceID)
 	err := s.HandleCommonHelloMessage(msg)
 	if err != nil {
+		log.Errorf("设备 %s 处理公共Hello消息失败: %v", msg.DeviceID, err)
 		return err
 	}
 
-	return s.serverTransport.SendHello("websocket", &s.clientState.OutputAudioFormat, nil)
+	log.Infof("设备 %s 准备发送Hello响应", msg.DeviceID)
+	err = s.serverTransport.SendHello("websocket", &s.clientState.OutputAudioFormat, nil)
+	if err != nil {
+		log.Errorf("设备 %s 发送Hello响应失败: %v", msg.DeviceID, err)
+		return err
+	}
+	log.Infof("设备 %s Hello响应发送成功", msg.DeviceID)
+	return nil
 }
 
 // handleListenMessage 处理监听消息

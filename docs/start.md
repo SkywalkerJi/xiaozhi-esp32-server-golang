@@ -28,6 +28,7 @@
 
   # 2. 启动管理后端（在 manager/backend 目录）
   cd manager/backend
+  go build -o xiaozhi_backen
   ./xiaozhi_backend -config config/config.json &
 
   # 3. 启动主服务器（在项目根目录）

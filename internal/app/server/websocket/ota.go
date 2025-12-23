@@ -125,13 +125,29 @@ func getMqttInfo(deviceId, clientId, otaConfigPrefix, ip string) *MqttInfo {
 		return nil
 	}
 
+	// 判断是否使用内置MQTT服务器(有hook功能)还是外部MQTT broker
+	useMqttServer := viper.GetBool("mqtt_server.enable")
+
+	var publishTopic, subscribeTopic string
+	if useMqttServer {
+		// 内置MQTT服务器: 使用 device-server,由hook自动重写为 /p2p/device_public/{mac}
+		publishTopic = client.DeviceMockPubTopicPrefix   // "device-server"
+		subscribeTopic = client.DeviceMockSubTopicPrefix // "null"
+	} else {
+		// 外部MQTT broker: 直接使用完整主题,避免所有设备消息混在一起
+		// 从clientId中解析MAC地址: "GID_test@@@b4_3a_45_5a_3e_98@@@xxx" -> "b4_3a_45_5a_3e_98"
+		macAddr := strings.ReplaceAll(deviceId, ":", "_")
+		publishTopic = fmt.Sprintf("%s%s", client.DevicePubTopicPrefix, macAddr)     // "/p2p/device_public/{mac}"
+		subscribeTopic = fmt.Sprintf("%s%s", client.DeviceSubTopicPrefix, macAddr)   // "/p2p/device_sub/{mac}"
+	}
+
 	return &MqttInfo{
 		Endpoint:       viper.GetString(otaConfigPrefix + "mqtt.endpoint"),
 		ClientId:       credentials.ClientId,
 		Username:       credentials.Username,
 		Password:       credentials.Password,
-		PublishTopic:   client.DeviceMockPubTopicPrefix,
-		SubscribeTopic: client.DeviceMockSubTopicPrefix,
+		PublishTopic:   publishTopic,
+		SubscribeTopic: subscribeTopic,
 	}
 }
 

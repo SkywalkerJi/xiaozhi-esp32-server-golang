@@ -84,16 +84,16 @@ websocket:
 # MQTT客户端配置（连接外部MQTT服务器）
 mqtt:
   enable: true                # 是否启用MQTT客户端, 当此值为false时会同时关闭udp服务器
-  broker: "127.0.0.1"         # MQTT代理服务器地址
+  broker: "192.168.1.188"         # MQTT代理服务器地址
   type: "tcp"                 # 连接类型
-  port: 2883                  # MQTT端口
+  port: 1883                  # MQTT端口
   client_id: "xiaozhi_server" # 客户端ID
   username: "admin"           # MQTT用户名
   password: "test!@#"         # MQTT密码
 
 # MQTT服务器配置（作为MQTT服务器运行）
 mqtt_server:
-  enable: true                          # 是否启用MQTT服务器
+  enable: false                          # 是否启用MQTT服务器
   listen_host: "0.0.0.0"                # 监听地址
   listen_port: 2883                     # 监听端口
   client_id: "xiaozhi_server"           # 服务器客户端ID
@@ -294,12 +294,12 @@ ota:
     websocket:
       url: "ws://192.168.1.5:8989/xiaozhi/v1/"  # WebSocket地址
     mqtt:
-      enable: false                # 当为true时，会将 mqtt 配置给设备
-      endpoint: "192.168.1.5"  # MQTT端点，可以带端口
+      enable: true                # 当为true时，会将 mqtt 配置给设备
+      endpoint: "192.168.1.188:1883"  # MQTT端点，可以带端口
   # 外部环境配置，线上环境用
   external:
     websocket:
-      url: "wss://www.tb263.cn:55555/go_ws/xiaozhi/v1/"  # WebSocket地址
+      url: "ws://192.168.1.5:8989/xiaozhi/v1"  # WebSocket地址
     mqtt:
       enable: false                # 当为true时，会将 mqtt 配置给设备
       endpoint: "www.youdomain.cn" # MQTT端点，可以带端口

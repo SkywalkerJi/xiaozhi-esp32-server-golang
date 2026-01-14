@@ -95,7 +95,7 @@ type ActivationRequest struct {
 
 func GetDeviceConfig(deviceInfo *DeviceInfo, deviceID, clientID string, otaUrl string) (*ServerResponse, error) {
 	url := otaUrl
-	//url := "http://192.168.208.214:8989/xiaozhi/ota/"
+	//url := "http://192.168.1.5:8989/xiaozhi/ota/"
 
 	jsonData, err := json.Marshal(deviceInfo)
 	if err != nil {

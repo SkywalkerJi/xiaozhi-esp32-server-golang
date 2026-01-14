@@ -205,7 +205,7 @@ const loadConfig = async () => {
       form.mcp.global.servers.push({
         name: '默认MCP服务器',
         type: 'streamablehttp',
-        url: 'http://192.168.208.214:3001/mcp',
+        url: 'http://192.168.1.5:3001/mcp',
         enabled: true
       })
     }

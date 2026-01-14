@@ -11,7 +11,7 @@ import (
 func TestConfigManager_GetSystemConfig(t *testing.T) {
 	// 创建配置管理器
 	config := map[string]interface{}{
-		"backend_url": "http://192.168.208.214:8080", // 根据实际backend地址调整
+		"backend_url": "http://192.168.1.5:8080", // 根据实际backend地址调整
 	}
 
 	manager, err := NewManagerUserConfigProvider(config)

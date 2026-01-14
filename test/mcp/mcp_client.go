@@ -134,7 +134,7 @@ func setupMCPConfig() {
 	servers := []map[string]interface{}{
 		{
 			"name":    "global_mcp",
-			"sse_url": "http://192.168.208.214:3001/sse",
+			"sse_url": "http://192.168.1.5:3001/sse",
 			"enabled": true,
 		},
 	}

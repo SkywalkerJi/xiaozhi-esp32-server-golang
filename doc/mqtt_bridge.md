@@ -122,10 +122,10 @@ ota:
   signature_key: "mqtt_key"
   test:
     websocket:
-      url: "ws://192.168.208.214:8989/xiaozhi/v1/"
+      url: "ws://192.168.1.5:8989/xiaozhi/v1/"
     mqtt:
       enable: true
-      endpoint: "192.168.208.214:5883"
+      endpoint: "192.168.1.5:5883"
   external:
     websocket:
       url: "wss://www.tb263.cn:55555/go_ws/xiaozhi/v1/"

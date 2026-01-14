@@ -15,10 +15,10 @@ ota:
   signature_key: "your_ota_signature_key_here"
   test:
     websocket:
-      url: "ws://192.168.208.214:8989/xiaozhi/v1/"
+      url: "ws://192.168.1.5:8989/xiaozhi/v1/"
     mqtt:
       enable: false
-      endpoint: "192.168.208.214"
+      endpoint: "192.168.1.5"
   external:
     websocket:
       url: "wss://www.tb263.cn:55555/go_ws/xiaozhi/v1/"
@@ -213,10 +213,10 @@ ota:
   signature_key: "your_ota_signature_key_here"
   test:  # 内网测试的返回
     websocket:
-      url: "ws://192.168.208.214:8989/xiaozhi/v1/"
+      url: "ws://192.168.1.5:8989/xiaozhi/v1/"
     mqtt:
       enable: true
-      endpoint: "192.168.208.214:1883"  # xiaozhi-mqtt-gateway中的mqtt server地址
+      endpoint: "192.168.1.5:1883"  # xiaozhi-mqtt-gateway中的mqtt server地址
   external:  # 外网的返回
     websocket:
       url: "wss://www.tb263.cn:55555/go_ws/xiaozhi/v1/"

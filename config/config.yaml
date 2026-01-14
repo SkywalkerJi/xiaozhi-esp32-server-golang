@@ -267,16 +267,16 @@ llm:
 # 视觉识别配置
 vision:
   enable_auth: false  # 是否启用身份验证
-  vision_url: "http://192.168.208.214:8989/xiaozhi/api/vision"  # 下发给设备的 视觉API地址
+  vision_url: "http://192.168.1.5:8989/xiaozhi/api/vision"  # 下发给设备的 视觉API地址
   # 视觉语言模型配置
   vllm:
     provider: "aliyun_vision"  # 视觉模型提供商
     # 阿里云视觉模型配置
     aliyun_vision:
       type: "openai"                               # 接口类型
-      model_name: "qwen-vl-plus-latest"            # 模型名称
+      model_name: "qwen3-vl-plus"            # 模型名称
       base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"  # API基础地址
-      api_key: "api_key"                           # API密钥
+      api_key: "sk-1013eb13e45541edb6346c2dfcb652fa"                           # API密钥
       max_token: 500                               # 最大生成token数
     # 豆包视觉模型配置
     doubao_vision:

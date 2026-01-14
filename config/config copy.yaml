@@ -267,7 +267,7 @@ llm:
 # 视觉识别配置
 vision:
   enable_auth: false  # 是否启用身份验证
-  vision_url: "http://192.168.208.214:8989/xiaozhi/api/vision"  # 下发给设备的 视觉API地址
+  vision_url: "http://192.168.1.5:8989/xiaozhi/api/vision"  # 下发给设备的 视觉API地址
   # 视觉语言模型配置
   vllm:
     provider: "aliyun_vision"  # 视觉模型提供商
@@ -292,10 +292,10 @@ ota:
   # 测试环境配置，内部测试用
   test:
     websocket:
-      url: "ws://192.168.208.214:8989/xiaozhi/v1/"  # WebSocket地址
+      url: "ws://192.168.1.5:8989/xiaozhi/v1/"  # WebSocket地址
     mqtt:
       enable: false                # 当为true时，会将 mqtt 配置给设备
-      endpoint: "192.168.208.214"  # MQTT端点，可以带端口
+      endpoint: "192.168.1.5"  # MQTT端点，可以带端口
   # 外部环境配置，线上环境用
   external:
     websocket:

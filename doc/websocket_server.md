@@ -52,10 +52,10 @@ OTA用于设备自动获取服务器下发的WebSocket/MQTT连接参数和固件
 ota:
   test:
     websocket:
-      url: "ws://192.168.208.214:8989/xiaozhi/v1/"
+      url: "ws://192.168.1.5:8989/xiaozhi/v1/"
     mqtt:
       enable: false
-      endpoint: "192.168.208.214"
+      endpoint: "192.168.1.5"
   external:
     websocket:
       url: "wss://www.tb263.cn:55555/go_ws/xiaozhi/v1/"

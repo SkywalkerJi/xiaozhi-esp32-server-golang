@@ -221,7 +221,7 @@ llm:
 # 视觉模型相关配置
 vision:
   enable_auth: false
-  vision_url: "http://192.168.208.214:8989/xiaozhi/api/vision"
+  vision_url: "http://192.168.1.5:8989/xiaozhi/api/vision"
   vllm:
     provider: "aliyun_vision"
     aliyun_vision:
@@ -241,9 +241,9 @@ vision:
 ota:
   test:
     websocket:
-      url: "ws://192.168.208.214:8989/xiaozhi/v1/"
+      url: "ws://192.168.1.5:8989/xiaozhi/v1/"
     mqtt:
-      endpoint: "192.168.208.214"
+      endpoint: "192.168.1.5"
   external:
     websocket:
       url: "wss://www.youdomain.cn/go_ws/xiaozhi/v1/"

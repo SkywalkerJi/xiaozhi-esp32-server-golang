@@ -17,7 +17,7 @@
 ```yaml
 vision:
   enable_auth: false
-  vision_url: "http://192.168.208.214:8989/xiaozhi/api/vision"
+  vision_url: "http://192.168.1.5:8989/xiaozhi/api/vision"
   vllm:
     provider: "aliyun_vision"
     aliyun_vision:

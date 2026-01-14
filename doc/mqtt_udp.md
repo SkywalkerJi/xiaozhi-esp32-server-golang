@@ -72,10 +72,10 @@ OTA（Over-the-Air）配置用于设备远程获取服务器、MQTT、WebSocket�
   ota:
     test:
       websocket:
-        url: "ws://192.168.208.214:8989/xiaozhi/v1/"
+        url: "ws://192.168.1.5:8989/xiaozhi/v1/"
       mqtt:
         enable: false
-        endpoint: "192.168.208.214"
+        endpoint: "192.168.1.5"
     external:
       websocket:
         url: "wss://www.tb263.cn:55555/go_ws/xiaozhi/v1/"
@@ -132,10 +132,10 @@ udp:
 ota:
   test:
     websocket:
-      url: "ws://192.168.208.214:8989/xiaozhi/v1/"
+      url: "ws://192.168.1.5:8989/xiaozhi/v1/"
     mqtt:
       enable: false
-      endpoint: "192.168.208.214"
+      endpoint: "192.168.1.5"
   external:
     websocket:
       url: "wss://www.tb263.cn:55555/go_ws/xiaozhi/v1/"

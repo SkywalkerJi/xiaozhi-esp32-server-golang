@@ -6,6 +6,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	log "xiaozhi-esp32-server-golang/logger"
 )
 
 // ClientSession 表示一个客户端会话
@@ -58,9 +60,15 @@ func (am *AuthManager) CreateSession(deviceID string) (*ClientSession, error) {
 		LastSeen:  time.Now(),
 	}
 
+	lockStart := time.Now()
 	am.mutex.Lock()
+	lockDuration := time.Since(lockStart)
 	am.sessions[sessionID] = session
 	am.mutex.Unlock()
+
+	if lockDuration > 5*time.Millisecond {
+		log.Warnf("[性能] CreateSession 锁等待耗时: %v (设备: %s)", lockDuration, deviceID)
+	}
 
 	return session, nil
 }

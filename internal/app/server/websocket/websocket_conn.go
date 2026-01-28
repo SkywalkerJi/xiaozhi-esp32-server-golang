@@ -143,14 +143,23 @@ func (c *WebSocketConn) packUdpBridgeAudioPacket(buffer []byte) []byte {
 }
 
 func (w *WebSocketConn) SendCmd(msg []byte) error {
+	lockStart := time.Now()
 	w.Lock()
+	lockDuration := time.Since(lockStart)
 	defer w.Unlock()
 
 	if w.closed {
 		return errors.New("connection is closed")
 	}
 
+	writeStart := time.Now()
 	err := w.conn.WriteMessage(websocket.TextMessage, msg)
+	writeDuration := time.Since(writeStart)
+
+	if lockDuration > 10*time.Millisecond || writeDuration > 50*time.Millisecond {
+		log.Warnf("[性能] WebSocket SendCmd: 锁等待=%v, 写入耗时=%v", lockDuration, writeDuration)
+	}
+
 	if err != nil {
 		log.Errorf("send cmd error: %v", err)
 		return err

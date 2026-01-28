@@ -111,7 +111,7 @@ func GenClientState(pctx context.Context, deviceID string) (*ClientState, error)
 			FrameDuration: types_audio.FrameDuration,
 			Format:        types_audio.Format,
 		},
-		OpusAudioBuffer: make(chan []byte, 100),
+		OpusAudioBuffer: make(chan []byte, 500),
 		AsrAudioBuffer: &AsrAudioBuffer{
 			PcmData:          make([]float32, 0),
 			AudioBufferMutex: sync.RWMutex{},

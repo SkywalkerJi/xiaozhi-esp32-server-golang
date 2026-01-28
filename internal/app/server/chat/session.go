@@ -244,10 +244,15 @@ func (s *ChatSession) HandleHelloMessage(msg *ClientMessage) error {
 }
 
 func (s *ChatSession) HandleMqttHelloMessage(msg *ClientMessage) error {
+	startTime := time.Now()
+	log.Infof("[性能] 设备 %s 开始处理MQTT Hello消息", msg.DeviceID)
+
 	// 检查HandleCommonHelloMessage的返回值
+	commonHelloStart := time.Now()
 	if err := s.HandleCommonHelloMessage(msg); err != nil {
 		return fmt.Errorf("处理公共hello消息失败: %v", err)
 	}
+	log.Infof("[性能] 设备 %s HandleCommonHelloMessage耗时: %v", msg.DeviceID, time.Since(commonHelloStart))
 
 	clientState := s.clientState
 
@@ -280,17 +285,27 @@ func (s *ChatSession) HandleMqttHelloMessage(msg *ClientMessage) error {
 	}
 
 	// 发送响应
-	return s.serverTransport.SendHello("udp", &clientState.OutputAudioFormat, udpConfig)
+	sendHelloStart := time.Now()
+	err = s.serverTransport.SendHello("udp", &clientState.OutputAudioFormat, udpConfig)
+	if err != nil {
+		return err
+	}
+	log.Infof("[性能] 设备 %s SendHello耗时: %v", msg.DeviceID, time.Since(sendHelloStart))
+	log.Infof("[性能] 设备 %s MQTT Hello消息处理完成, 总耗时: %v", msg.DeviceID, time.Since(startTime))
+	return nil
 }
 
 func (s *ChatSession) HandleCommonHelloMessage(msg *ClientMessage) error {
-	log.Infof("设备 %s 开始处理公共Hello消息", msg.DeviceID)
+	startTime := time.Now()
+	log.Infof("[性能] 设备 %s 开始处理公共Hello消息", msg.DeviceID)
 
 	// 创建新会话
+	createSessionStart := time.Now()
 	session, err := auth.A().CreateSession(msg.DeviceID)
 	if err != nil {
 		return fmt.Errorf("创建会话失败: %v", err)
 	}
+	log.Infof("[性能] 设备 %s 创建会话耗时: %v", msg.DeviceID, time.Since(createSessionStart))
 
 	// 更新客户端状态
 	s.clientState.SessionID = session.ID
@@ -312,24 +327,31 @@ func (s *ChatSession) HandleCommonHelloMessage(msg *ClientMessage) error {
 
 	s.asrManager.ProcessVadAudio(clientState.Ctx, s.Close)
 
+	log.Infof("[性能] 设备 %s 公共Hello消息处理完成, 总耗时: %v", msg.DeviceID, time.Since(startTime))
 	return nil
 }
 
 func (s *ChatSession) HandleWebsocketHelloMessage(msg *ClientMessage) error {
-	log.Infof("设备 %s 开始处理Websocket Hello消息", msg.DeviceID)
+	startTime := time.Now()
+	log.Infof("[性能] 设备 %s 开始处理Websocket Hello消息", msg.DeviceID)
+
+	commonHelloStart := time.Now()
 	err := s.HandleCommonHelloMessage(msg)
 	if err != nil {
 		log.Errorf("设备 %s 处理公共Hello消息失败: %v", msg.DeviceID, err)
 		return err
 	}
+	log.Infof("[性能] 设备 %s HandleCommonHelloMessage耗时: %v", msg.DeviceID, time.Since(commonHelloStart))
 
 	log.Infof("设备 %s 准备发送Hello响应", msg.DeviceID)
+	sendHelloStart := time.Now()
 	err = s.serverTransport.SendHello("websocket", &s.clientState.OutputAudioFormat, nil)
 	if err != nil {
 		log.Errorf("设备 %s 发送Hello响应失败: %v", msg.DeviceID, err)
 		return err
 	}
-	log.Infof("设备 %s Hello响应发送成功", msg.DeviceID)
+	log.Infof("[性能] 设备 %s SendHello耗时: %v", msg.DeviceID, time.Since(sendHelloStart))
+	log.Infof("[性能] 设备 %s Websocket Hello消息处理完成, 总耗时: %v", msg.DeviceID, time.Since(startTime))
 	return nil
 }
 

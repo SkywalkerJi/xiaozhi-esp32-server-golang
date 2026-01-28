@@ -77,7 +77,7 @@ func readWavFile(filePath string) ([]float32, error) {
 func main() {
 	// 定义命令行参数
 	var (
-		host = flag.String("host", "192.168.208.214", "FunASR服务器IP地址")
+		host = flag.String("host", "192.168.1.5", "FunASR服务器IP地址")
 		port = flag.String("port", "10096", "FunASR服务器端口")
 		mode = flag.String("mode", "offline", "识别模式 (online/offline)")
 		file = flag.String("file", "test.wav", "要识别的WAV文件路径")

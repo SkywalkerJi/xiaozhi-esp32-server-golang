@@ -21,13 +21,13 @@ func main() {
 	if endPoint == "" {
 		fmt.Println("错误: 必须指定 endpoint 参数")
 		fmt.Println("使用方法: go run . -endpoint <websocket_url>")
-		fmt.Println("示例: go run . -endpoint ws://192.168.208.214:8989/mcp?token=xxx")
+		fmt.Println("示例: go run . -endpoint ws://192.168.1.5:8989/mcp?token=xxx")
 		os.Exit(1)
 	}
 
 	// 注释掉硬编码的endpoint
 	//endPoint := "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjE0NDQzNSwiYWdlbnRJZCI6MzUxNjQsImVuZHBvaW50SWQiOiJhZ2VudF8zNTE2NCIsInB1cnBvc2UiOiJtY3AtZW5kcG9pbnQiLCJpYXQiOjE3NDk1NDk2MzR9.nPMAHaYyRrxQGqHnzFk-SqLDb61p3YGJqRsQ3TZZEqPxQgef0jg_fTLiZsTNVI34VaNOaOobvKnl55VoIuYx7w"
-	//endPoint := "ws://192.168.208.214:8989/mcp?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImFnZW50SWQiOiIxIiwiZW5kcG9pbnRJZCI6ImFnZW50XzEiLCJwdXJwb3NlIjoibWNwLWVuZHBvaW50IiwiZXhwIjoxNzU2OTczNDM0LCJpYXQiOjE3NTY4ODcwMzR9.igLC-IFSgaf9maZljD-Tq3tI8nUmhx4vaOBcIsAHrRs"
+	//endPoint := "ws://192.168.1.5:8989/mcp?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImFnZW50SWQiOiIxIiwiZW5kcG9pbnRJZCI6ImFnZW50XzEiLCJwdXJwb3NlIjoibWNwLWVuZHBvaW50IiwiZXhwIjoxNzU2OTczNDM0LCJpYXQiOjE3NTY4ODcwMzR9.igLC-IFSgaf9maZljD-Tq3tI8nUmhx4vaOBcIsAHrRs"
 
 	fmt.Printf("正在连接到 WebSocket endpoint: %s\n", endPoint)
 	s := server.NewMCPServer("mcp_websocket_server", "1.0.0")

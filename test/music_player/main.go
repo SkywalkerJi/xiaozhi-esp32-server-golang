@@ -1,3 +1,8 @@
+// +build ignore
+
+// 注意：此测试程序依赖 play_music.NewMusicPlayer 函数，该函数尚未实现
+// 要使此程序工作，需要先实现 play_music.NewMusicPlayer 函数
+
 package main
 
 import (

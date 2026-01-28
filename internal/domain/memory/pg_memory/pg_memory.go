@@ -296,7 +296,7 @@ func (p *PGMemory) convertToSchemaMessage(msg *ConversationMessage) *schema.Mess
 				if text, ok := contentMap["text"].(string); ok {
 					part.Text = text
 				}
-				result.MultiContent = append(result.MultiContent, part)
+				result.MultiContent = append(result.MultiContent, *part)
 			}
 		}
 	}

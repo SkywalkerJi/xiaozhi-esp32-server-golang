@@ -106,7 +106,8 @@ func ExampleMCPUsage(t *testing.T) {
 	defer globalManager.Stop()
 
 	// 3. 获取设备MCP管理器
-	deviceManager := GetDeviceMCPManager()
+	// 注意：GetDeviceMCPManager 尚未实现
+	// deviceManager := GetDeviceMCPManager()
 
 	// 4. 模拟等待工具注册
 	time.Sleep(30 * time.Second)
@@ -115,7 +116,8 @@ func ExampleMCPUsage(t *testing.T) {
 	showGlobalTools(globalManager)
 
 	// 6. 展示设备工具
-	showDeviceTools(deviceManager, "example_device")
+	// 注意：showDeviceTools 依赖 DeviceMCPManager，尚未实现
+	// showDeviceTools(deviceManager, "example_device")
 
 	// 7. 演示工具调用
 	demonstrateToolCalling(globalManager)
@@ -169,24 +171,25 @@ func showGlobalTools(manager *GlobalMCPManager) {
 }
 
 // showDeviceTools 展示设备工具
-func showDeviceTools(manager *DeviceMCPManager, deviceID string) {
-	fmt.Printf("\n3. 设备 %s 的工具列表:\n", deviceID)
-
-	tools := manager.GetDeviceTools(deviceID)
-	if len(tools) == 0 {
-		fmt.Println("   暂无设备工具（需要设备连接到MCP WebSocket端点）")
-		return
-	}
-
-	for name, tool := range tools {
-		info, err := tool.Info(context.Background())
-		if err != nil {
-			fmt.Printf("   ❌ %s: 获取信息失败 - %v\n", name, err)
-			continue
-		}
-		fmt.Printf("   ✓ %s: %s\n", info.Name, info.Desc)
-	}
-}
+// 注意：DeviceMCPManager 类型尚未实现
+// func showDeviceTools(manager *DeviceMCPManager, deviceID string) {
+// 	fmt.Printf("\n3. 设备 %s 的工具列表:\n", deviceID)
+//
+// 	tools := manager.GetDeviceTools(deviceID)
+// 	if len(tools) == 0 {
+// 		fmt.Println("   暂无设备工具（需要设备连接到MCP WebSocket端点）")
+// 		return
+// 	}
+//
+// 	for name, tool := range tools {
+// 		info, err := tool.Info(context.Background())
+// 		if err != nil {
+// 			fmt.Printf("   ❌ %s: 获取信息失败 - %v\n", name, err)
+// 			continue
+// 		}
+// 		fmt.Printf("   ✓ %s: %s\n", info.Name, info.Desc)
+// 	}
+// }
 
 // demonstrateToolCalling 演示工具调用
 func demonstrateToolCalling(manager *GlobalMCPManager) {

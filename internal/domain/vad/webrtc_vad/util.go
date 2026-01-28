@@ -27,13 +27,13 @@ func getVadConfigFromMap(config map[string]interface{}) WebRTCVADConfig {
 	mode := DefaultMode
 
 	if val, ok := config["vad_sample_rate"]; ok {
-		if sampleRate, ok := val.(int); ok {
-			sampleRate = sampleRate
+		if v, ok := val.(int); ok {
+			sampleRate = v
 		}
 	}
 	if val, ok := config["vad_mode"]; ok {
-		if mode, ok := val.(int); ok {
-			mode = mode
+		if v, ok := val.(int); ok {
+			mode = v
 		}
 	}
 	return WebRTCVADConfig{

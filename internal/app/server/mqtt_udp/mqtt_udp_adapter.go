@@ -72,7 +72,7 @@ func (s *MqttUdpAdapter) Start() error {
 	const retryInterval = 5 * time.Second
 
 	Info("MqttUdpAdapter开始启动，尝试连接MQTT服务器...")
-	Info("MQTT配置: Broker=%s:%d, ClientID=%s, Username=%s", s.mqttConfig.Broker, s.mqttConfig.Port, s.mqttConfig.ClientID, s.mqttConfig.Username)
+	Infof("MQTT配置: Broker=%s:%d, ClientID=%s, Username=%s", s.mqttConfig.Broker, s.mqttConfig.Port, s.mqttConfig.ClientID, s.mqttConfig.Username)
 
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("%s://%s:%d", s.mqttConfig.Type, s.mqttConfig.Broker, s.mqttConfig.Port))

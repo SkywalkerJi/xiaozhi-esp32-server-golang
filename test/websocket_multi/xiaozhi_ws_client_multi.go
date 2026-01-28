@@ -420,6 +420,4 @@ func (w *WsClient) sendAudioDataToServer() error {
 		}
 		w.sendListenStop()
 	}
-
-	return nil
 }

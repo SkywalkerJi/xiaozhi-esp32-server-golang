@@ -94,8 +94,6 @@ func (c *AsrWsClient) SendMessages(ctx context.Context, audioStream <-chan []flo
 			c.seq++
 		}
 	}
-
-	return nil
 }
 
 func (c *AsrWsClient) recvMessages(ctx context.Context, resChan chan<- *response.AsrResponse, stopChan chan<- struct{}) {

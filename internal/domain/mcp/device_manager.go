@@ -112,6 +112,7 @@ func NewWsEndPointMcpClient(ctx context.Context, deviceID string, conn *websocke
 
 	wsTransport, err := NewWebsocketTransport(conn)
 	if err != nil {
+		cancel()
 		logger.Errorf("创建MCP客户端失败: %v", err)
 		return nil
 	}
@@ -141,6 +142,7 @@ func NewIotOverMcpClient(deviceID string, conn ConnInterface) *McpClientInstance
 
 	wsTransport, err := NewIotOverMcpTransport(conn)
 	if err != nil {
+		cancel()
 		logger.Errorf("创建MCP客户端失败: %v", err)
 		return nil
 	}

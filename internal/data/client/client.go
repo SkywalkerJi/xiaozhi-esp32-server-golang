@@ -308,6 +308,7 @@ func (s *ClientState) InitLlm() error {
 
 	llmProvider, err := s.getLLMProvider()
 	if err != nil {
+		cancel()
 		log.Errorf("创建 LLM 提供者失败: %v", err)
 		return err
 	}

@@ -349,7 +349,7 @@ func handleHello(client mqtt.Client, msg mqtt.Message) {
 
 	globalChannel <- &helloMessage
 
-	fmt.Printf("处理 hello 消息: %s\n", helloMessage)
+	fmt.Printf("处理 hello 消息: %+v\n", helloMessage)
 
 }
 
@@ -467,7 +467,7 @@ func sendWavFileWithOpusEncoding(udpInstance *UDPClient, filePath string) error 
 		return fmt.Errorf("转换WAV文件失败: %v", err)
 	}
 
-	fmt.Printf("开始发送音频数据\n", len(opusFrames))
+	fmt.Printf("开始发送音频数据，帧数: %d\n", len(opusFrames))
 
 	for i, frame := range opusFrames {
 		fmt.Printf("Opus帧 %d 长度: %d\n", i, len(frame))
@@ -771,15 +771,4 @@ func sendTextToSpeech(mqttClient mqtt.Client, sessionID string, udpInstance *UDP
 			}
 		}
 	}
-
-	//genAndSendAudio("你好", 100)
-	//time.Sleep(30 * time.Second)
-	/*genAndSendAudio("再来一个", 20)
-	time.Sleep(30 * time.Second)
-	genAndSendAudio("你今天穿的衣服真好看", 20)
-	time.Sleep(30 * time.Second)
-	genAndSendAudio("明天准备穿什么", 20)
-	time.Sleep(30 * time.Second)*/
-
-	return nil
 }

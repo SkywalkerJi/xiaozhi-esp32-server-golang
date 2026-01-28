@@ -22,7 +22,7 @@ func TestEdgeTTSProvider(t *testing.T) {
 	defer cancel()
 
 	t.Run("TestTextToSpeech", func(t *testing.T) {
-		frames, err := provider.TextToSpeech(ctx, "你好，EdgeTTS测试")
+		frames, err := provider.TextToSpeech(ctx, "你好，EdgeTTS测试", 16000, 1, 60)
 		if err != nil {
 			t.Fatalf("TextToSpeech失败: %v", err)
 		}
@@ -32,7 +32,7 @@ func TestEdgeTTSProvider(t *testing.T) {
 	})
 
 	t.Run("TestTextToSpeechStream", func(t *testing.T) {
-		outputChan, err := provider.TextToSpeechStream(ctx, "你好，EdgeTTS流式测试")
+		outputChan, err := provider.TextToSpeechStream(ctx, "你好，EdgeTTS流式测试", 16000, 1, 60)
 		if err != nil {
 			t.Fatalf("TextToSpeechStream失败: %v", err)
 		}

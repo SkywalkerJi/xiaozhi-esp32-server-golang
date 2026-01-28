@@ -81,3 +81,7 @@ func (t *WebsocketTransport) SetNotificationHandler(handler func(notification mc
 func (t *WebsocketTransport) Close() error {
 	return t.conn.Close()
 }
+
+func (t *WebsocketTransport) GetSessionId() string {
+	return ""
+}

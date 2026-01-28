@@ -266,12 +266,14 @@ func (f *Funasr) StreamingRecognize(ctx context.Context, audioStream <-chan []fl
 
 	messageBytes, err := json.Marshal(firstMessage)
 	if err != nil {
+		cancelFunc()
 		f.releaseConnection(conn)
 		return nil, fmt.Errorf("序列化初始消息失败: %v", err)
 	}
 
 	err = f.writeMessage(conn, websocket.TextMessage, messageBytes)
 	if err != nil {
+		cancelFunc()
 		f.releaseConnection(conn)
 		return nil, fmt.Errorf("发送初始消息失败: %v", err)
 	}

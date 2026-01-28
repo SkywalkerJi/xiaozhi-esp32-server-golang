@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func containsRune(slice []rune, target rune) bool {
+func containsRuneSimple(slice []rune, target rune) bool {
 	for _, r := range slice {
 		if r == target {
 			return true
@@ -13,7 +13,7 @@ func containsRune(slice []rune, target rune) bool {
 	return false
 }
 
-func extractSmartSentences(text string, minLen, maxLen int) (sentences []string, remaining string) {
+func extractSmartSentencesSimple(text string, minLen, maxLen int) (sentences []string, remaining string) {
 	// 有效分割符集合（可自定义扩展）
 	splitTokens := []rune{'。', '！', '？', '；', '\n', '.', '!', '?', ';'}
 
@@ -28,7 +28,7 @@ func extractSmartSentences(text string, minLen, maxLen int) (sentences []string,
 		// 在有效窗口中寻找分割点
 		splitPos := -1
 		for i := windowSize - 1; i >= minLen-1; i-- {
-			if containsRune(splitTokens, current[i]) {
+			if containsRuneSimple(splitTokens, current[i]) {
 				splitPos = i
 				break
 			}
@@ -46,9 +46,13 @@ func extractSmartSentences(text string, minLen, maxLen int) (sentences []string,
 	return
 }
 
-func main() {
-	text := "大家好！今天天气不错。我们一起学习自然语言处理。这个例子演示文本分割功能。"
-	sentences, remaining := extractSmartSentences(text, 3, 20)
-	fmt.Println(sentences)
-	fmt.Println(remaining)
+func init() {
+	// 使用 init 替代 main，防止多个 main 函数冲突
+	// 这是一个简化版本的文本分割演示
+	_ = func() {
+		text := "大家好！今天天气不错。我们一起学习自然语言处理。这个例子演示文本分割功能。"
+		sentences, remaining := extractSmartSentencesSimple(text, 3, 20)
+		fmt.Println(sentences)
+		fmt.Println(remaining)
+	}
 }

@@ -33,7 +33,7 @@ func websocketServer() {
 
 		transport, err := NewWebsocketTransport(conn)
 		if err != nil {
-			fmt.Println("Failed to create transport: %v", err)
+			fmt.Printf("Failed to create transport: %v\n", err)
 			return
 		}
 
@@ -43,7 +43,7 @@ func websocketServer() {
 
 		err = client.Start(ctx)
 		if err != nil {
-			fmt.Println("Failed to start client: %v", err)
+			fmt.Printf("Failed to start client: %v\n", err)
 			return
 		}
 
@@ -60,7 +60,7 @@ func websocketServer() {
 
 		serverInfo, err := client.Initialize(ctx, initRequest)
 		if err != nil {
-			fmt.Println("Failed to initialize: %v", err)
+			fmt.Printf("Failed to initialize: %v\n", err)
 			return
 		}
 
@@ -70,7 +70,7 @@ func websocketServer() {
 		if serverInfo.Capabilities.Tools != nil {
 			tools, err := client.ListTools(ctx, mcp.ListToolsRequest{})
 			if err != nil {
-				fmt.Println("Failed to list tools: %v", err)
+				fmt.Printf("Failed to list tools: %v\n", err)
 				return
 			}
 

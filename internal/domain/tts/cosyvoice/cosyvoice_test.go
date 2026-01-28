@@ -1,6 +1,7 @@
 package cosyvoice
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -25,7 +26,9 @@ func TestCosyVoiceTTS(t *testing.T) {
 
 	// 测试文本转语音
 	t.Run("TestTextToSpeech", func(t *testing.T) {
-		frames, err := provider.TextToSpeech("你会说四川话吗")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		frames, err := provider.TextToSpeech(ctx, "你会说四川话吗", 16000, 1, 60)
 		if err != nil {
 			t.Fatalf("TextToSpeech失败: %v", err)
 		}
@@ -37,12 +40,12 @@ func TestCosyVoiceTTS(t *testing.T) {
 
 	// 测试流式文本转语音
 	t.Run("TestTextToSpeechStream", func(t *testing.T) {
-		outputChan, cancel, err := provider.TextToSpeechStream("你会说四川话吗")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		outputChan, err := provider.TextToSpeechStream(ctx, "你会说四川话吗", 16000, 1, 60)
 		if err != nil {
 			t.Fatalf("TextToSpeechStream失败: %v", err)
 		}
-
-		defer cancel()
 
 		// 接收所有帧
 		var receivedFrames [][]byte

@@ -122,7 +122,6 @@ func generateClientSessionID() (string, error) {
 
 // ValidateToken 验证令牌
 func (am *AuthManager) ValidateToken(token string) bool {
-	return true
 	// 移除 "Bearer " 前缀
 	if len(token) > 7 && token[:7] == "Bearer " {
 		token = token[7:]

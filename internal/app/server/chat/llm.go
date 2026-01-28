@@ -339,7 +339,7 @@ func (l *LLMManager) handleToolCallResponse(ctx context.Context, userMessage *sc
 			contentList = mcpResp.GetContent()
 		} else if toolCallResult, ok := l.handleToolResult(fcResult); ok {
 			if toolCallResult.IsError {
-				log.Errorf("工具调用失败: %s, 错误: %s", fcResult, toolCallResult.IsError)
+				log.Errorf("工具调用失败: %s, 错误: %v", fcResult, toolCallResult.IsError)
 			}
 			contentList = toolCallResult.Content
 		}

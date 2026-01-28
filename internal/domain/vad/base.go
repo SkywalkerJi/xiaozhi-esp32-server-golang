@@ -29,5 +29,4 @@ func ReleaseVAD(vad inter.VAD) error {
 	default:
 		return errors.New("invalid vad type")
 	}
-	return nil
 }

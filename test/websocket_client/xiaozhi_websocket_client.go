@@ -428,8 +428,6 @@ func sendWavFileWithOpusEncoding(conn *websocket.Conn, filePath string) error {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-
-	return nil
 }
 
 // 读取并发送音频文件（原始方式，不使用Opus编码）
@@ -625,6 +623,4 @@ func sendTextToSpeech(conn *websocket.Conn, deviceID string) error {
 			go f()
 		}
 	}
-
-	return nil
 }

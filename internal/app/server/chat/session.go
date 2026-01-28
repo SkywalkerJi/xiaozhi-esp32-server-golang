@@ -695,7 +695,7 @@ func (s *ChatSession) OnListenStart() error {
 					// text 为空，检查是否需要重新启动ASR
 					diffTs := time.Now().Unix() - startIdleTime
 					if startIdleTime > 0 && diffTs <= maxIdleTime {
-						log.Warnf("ASR识别结果为空，尝试重启ASR识别, diff ts: %s", diffTs)
+						log.Warnf("ASR识别结果为空，尝试重启ASR识别, diff ts: %d", diffTs)
 						if restartErr := s.asrManager.RestartAsrRecognition(ctx); restartErr != nil {
 							log.Errorf("重启ASR识别失败: %v", restartErr)
 							s.Close()

@@ -109,7 +109,7 @@ func TestTextToSpeechStream(t *testing.T) {
 	workqueue.ParallelizeUntil(context.Background(), 3, len(textList), func(piece int) {
 		text := textList[piece]
 		fmt.Println("开始 speech text: ", text)
-		ch, err := provider.TextToSpeechStream(context.Background(), text)
+		ch, err := provider.TextToSpeechStream(context.Background(), text, 16000, 1, 60)
 		if err != nil {
 			fmt.Println("TextToSpeechStream 连接失败: ", err)
 			return

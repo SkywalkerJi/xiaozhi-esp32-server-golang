@@ -346,9 +346,35 @@ memory:
   mem0:
     api_key: "your_mem0_api_key_here"
     base_url: "https://api.mem0.ai"
-    enable_search: true         #允许在调用llm之前搜索memory,会有200ms左右延迟  
+    enable_search: true         #允许在调用llm之前搜索memory,会有200ms左右延迟
     search_threshold: 0.5       #搜索阈值,0.5表示只有当搜索到的memory与用户输入的相似度超过0.5时,才会将其加入到llm的输入中
     search_top_k: 3             #搜索TopK,表示搜索到的memory中,相似度最高的TopK个memory会被加入到llm的输入中
+  # PostgreSQL 记忆配置
+  postgres:
+    host: "localhost"
+    port: "5432"
+    username: "xiaozhi"
+    password: "xiaozhi_password"
+    database: "xiaozhi_admin"
+    ssl_mode: "disable"
+    enable_audio_storage: true    # 是否启用音频存储到MinIO
+    message_retention_days: 90    # 消息保留天数
+
+# MinIO 对象存储配置
+minio:
+  endpoint: "localhost:9000"          # MinIO 服务地址
+  access_key_id: "minioadmin"         # 访问密钥ID
+  secret_access_key: "minioadmin123"  # 访问密钥
+  use_ssl: false                      # 是否使用SSL
+  bucket_audio: "xiaozhi-audio"       # 音频文件存储桶
+  region: "us-east-1"                 # 区域
+
+# 对话存储配置
+conversation:
+  storage_type: "postgres"            # 对话存储类型: redis, postgres
+  postgres:
+    enable_audio_storage: true        # 是否启用音频存储
+    message_retention_days: 90        # 消息保留天数（0表示永久保留）
 
 # 启用欢迎语
 enable_greeting: true

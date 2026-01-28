@@ -7,6 +7,7 @@ import (
 	"xiaozhi-esp32-server-golang/internal/domain/memory/mem0"
 	"xiaozhi-esp32-server-golang/internal/domain/memory/memobase"
 	"xiaozhi-esp32-server-golang/internal/domain/memory/nomemo"
+	"xiaozhi-esp32-server-golang/internal/domain/memory/pg_memory"
 
 	"github.com/cloudwego/eino/schema"
 )
@@ -40,6 +41,7 @@ const (
 	MemoryTypeNone     MemoryType = "nomemo"
 	MemoryTypeMemobase MemoryType = "memobase" // Memobase 长期记忆
 	MemoryTypeMem0     MemoryType = "mem0"     // Mem0 记忆服务
+	MemoryTypePostgres MemoryType = "postgres" // PostgreSQL 记忆存储
 )
 
 // GetProvider 获取指定类型的记忆提供者
@@ -59,6 +61,8 @@ func GetProviderByType(memoryType MemoryType, config map[string]interface{}) (Me
 		return memobase.GetWithConfig(config)
 	case MemoryTypeMem0:
 		return mem0.GetMem0ClientWithConfig(config)
+	case MemoryTypePostgres:
+		return pg_memory.GetWithConfig(config)
 	default:
 		return nil, fmt.Errorf("unsupported memory type: %v", memoryType)
 	}

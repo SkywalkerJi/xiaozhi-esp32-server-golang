@@ -19,11 +19,13 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
+	Type     string `json:"type"`     // mysql, postgres, sqlite
 	Host     string `json:"host"`
 	Port     string `json:"port"`
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Database string `json:"database"`
+	SSLMode  string `json:"ssl_mode"` // PostgreSQL SSL 模式: disable, require, verify-ca, verify-full
 }
 
 type JWTConfig struct {
@@ -39,6 +41,9 @@ func LoadWithPath(configPath string) *Config {
 	config := LoadFromFile(configPath)
 
 	// 优先使用环境变量覆盖数据库配置
+	if dbType := os.Getenv("DB_TYPE"); dbType != "" {
+		config.Database.Type = dbType
+	}
 	if host := os.Getenv("DB_HOST"); host != "" {
 		config.Database.Host = host
 	}
@@ -53,6 +58,9 @@ func LoadWithPath(configPath string) *Config {
 	}
 	if database := os.Getenv("DB_NAME"); database != "" {
 		config.Database.Database = database
+	}
+	if sslMode := os.Getenv("DB_SSL_MODE"); sslMode != "" {
+		config.Database.SSLMode = sslMode
 	}
 
 	fmt.Println("config", config)

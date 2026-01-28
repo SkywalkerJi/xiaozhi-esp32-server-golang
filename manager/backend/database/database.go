@@ -6,6 +6,7 @@ import (
 	"xiaozhi/manager/backend/config"
 
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -14,14 +15,40 @@ func Init(cfg config.DatabaseConfig) *gorm.DB {
 	var db *gorm.DB
 	var err error
 
-	if cfg.Database == "sqlite" {
+	dbType := cfg.Type
+	if dbType == "" {
+		// 向后兼容：如果没有设置类型，根据数据库名判断
+		if cfg.Database == "sqlite" {
+			dbType = "sqlite"
+		} else {
+			dbType = "mysql"
+		}
+	}
+
+	switch dbType {
+	case "sqlite":
 		// SQLite 数据库连接
 		log.Println("使用SQLite数据库:", cfg.Host)
 		db, err = gorm.Open(sqlite.Open(cfg.Host), &gorm.Config{})
-	} else {
+
+	case "postgres":
+		// PostgreSQL 数据库连接
+		sslMode := cfg.SSLMode
+		if sslMode == "" {
+			sslMode = "disable"
+		}
+		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=Asia/Shanghai",
+			cfg.Host, cfg.Username, cfg.Password, cfg.Database, cfg.Port, sslMode)
+		log.Println("使用PostgreSQL数据库:", cfg.Host)
+		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
+	case "mysql":
+		fallthrough
+	default:
 		// MySQL 数据库连接
 		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 			cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
+		log.Println("使用MySQL数据库:", cfg.Host)
 		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	}
 

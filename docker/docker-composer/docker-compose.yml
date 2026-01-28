@@ -1,27 +1,69 @@
 version: '3.8'
 
 services:
-  # MySQL数据库服务
-  mysql:
-    image: mysql:8.0
-    container_name: xiaozhi-mysql
+  # PostgreSQL数据库服务
+  postgres:
+    image: postgres:16-alpine
+    container_name: xiaozhi-postgres
     environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: xiaozhi_admin
+      POSTGRES_USER: xiaozhi
+      POSTGRES_PASSWORD: xiaozhi_password
+      POSTGRES_DB: xiaozhi_admin
     ports:
-      - "23306:3306"        #可以不进行映射
+      - "25432:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password --skip-ssl
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
     networks:
       - xiaozhi-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mysql", "-h", "localhost", "-P", "3306", "-u", "root", "-ppassword", "-e", "SELECT 1"]
+      test: ["CMD-SHELL", "pg_isready -U xiaozhi -d xiaozhi_admin"]
       timeout: 5s
       retries: 3
       interval: 10s
-      start_period: 180s
+      start_period: 30s
+
+  # Redis缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: xiaozhi-redis
+    ports:
+      - "26379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    networks:
+      - xiaozhi-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 5s
+      retries: 3
+      interval: 10s
+
+  # MinIO对象存储服务
+  minio:
+    image: minio/minio:latest
+    container_name: xiaozhi-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"   # API端口
+      - "9001:9001"   # 控制台端口
+    volumes:
+      - minio_data:/data
+    networks:
+      - xiaozhi-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      timeout: 5s
+      retries: 3
+      interval: 10s
+      start_period: 10s
 
   # 主程序服务
   main-server:
@@ -29,20 +71,31 @@ services:
     container_name: xiaozhi-main-server
     command: ["/workspace/bin/xiaozhi_server", "-c", "/workspace/config/config.yaml"]
     ports:
-      - "8989:8989"        # websocket服务 端口 18989端口
-      - "2883:2883"        # mqtt server 12883
-      - "8888:8888/udp"     # udp server 8888
+      - "8989:8989"        # websocket服务端口
+      - "2883:2883"        # mqtt server
+      - "8888:8888/udp"    # udp server
     depends_on:
-      mysql:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
       backend:
         condition: service_started
     environment:
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_USER=root
-      - DB_PASSWORD=password
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=xiaozhi
+      - DB_PASSWORD=xiaozhi_password
       - DB_NAME=xiaozhi_admin
+      - DB_SSL_MODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
       - BACKEND_URL=http://backend:8080
     volumes:
       - ../../config:/workspace/config
@@ -56,16 +109,18 @@ services:
     image: ghcr.io/hackers365/xiaozhi_manager_backend:0.4.2
     container_name: xiaozhi-backend
     ports:
-      - "8081:8080"        # 后端管理服务 端口 映射至宿主机 28080
+      - "8081:8080"        # 后端管理服务端口
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     environment:
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_USER=root
-      - DB_PASSWORD=password
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=xiaozhi
+      - DB_PASSWORD=xiaozhi_password
       - DB_NAME=xiaozhi_admin
+      - DB_SSL_MODE=disable
     volumes:
       - ../../manager/backend/config:/root/config
     networks:
@@ -77,7 +132,7 @@ services:
     image: ghcr.io/hackers365/xiaozhi_manager_frontend:0.4.2
     container_name: xiaozhi-frontend
     ports:
-      - "8080:80"           # 前端管理服务 端口 映射至宿主机 18080
+      - "8080:80"           # 前端管理服务端口
     depends_on:
       - backend
     networks:
@@ -85,7 +140,9 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql_data:
+  postgres_data:
+  redis_data:
+  minio_data:
 
 networks:
   xiaozhi-network:

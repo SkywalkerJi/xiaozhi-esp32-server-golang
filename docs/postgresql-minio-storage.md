@@ -1,5 +1,35 @@
 # PostgreSQL + MinIO 存储改造方案
 
+## 快速开始（本地开发）
+
+```bash
+# 1. 启动基础设施服务
+cd docker/docker-composer
+docker-compose -f docker-compose.dev.yml up -d
+
+# 2. 等待服务就绪（约 30 秒）
+docker-compose -f docker-compose.dev.yml ps
+
+# 3. 配置后端使用 PostgreSQL
+cp manager/backend/config/config.dev.json manager/backend/config/config.json
+
+# 4. 启动后端服务（新终端）
+cd manager/backend && go run main.go
+
+# 5. 启动前端服务（新终端）
+cd manager/frontend && npm run dev
+
+# 6. 启动主服务（新终端）
+cd cmd/server && go run main.go -c ../../config/config.yaml
+
+# 访问地址：
+# - 前端管理：http://localhost:5173 (Vite dev server)
+# - 后端 API：http://localhost:8080
+# - MinIO 控制台：http://localhost:19001 (minioadmin/minioadmin123)
+```
+
+---
+
 ## 概述
 
 本文档描述了将现有的 MySQL + Redis 存储架构改造为 PostgreSQL + MinIO 的实现方案。
@@ -133,8 +163,10 @@ CREATE TABLE audio_files (
 | `manager/backend/database/database.go` | 支持 PostgreSQL 数据库初始化 |
 | `manager/backend/config/config.go` | 添加 `Type` 和 `SSLMode` 配置字段 |
 | `internal/domain/memory/base.go` | 注册 `postgres` 记忆类型 |
-| `docker/docker-composer/docker-compose.yml` | 更新为 PostgreSQL + Redis + MinIO 服务 |
+| `docker/docker-composer/docker-compose.yml` | 更新为 PostgreSQL + Redis + MinIO 服务（生产环境） |
+| `docker/docker-composer/docker-compose.dev.yml` | 新增本地开发环境配置（仅基础设施） |
 | `config/config.yaml` | 添加 MinIO 和对话存储配置 |
+| `manager/backend/config/config.dev.json` | 新增 PostgreSQL 开发环境配置示例 |
 
 ---
 
@@ -142,19 +174,76 @@ CREATE TABLE audio_files (
 
 ### 1. Docker Compose 部署
 
-#### 启动服务
+#### 方式一：完整部署（生产环境）
+
+启动所有服务（PostgreSQL + Redis + MinIO + 前后端 + 主服务）：
 
 ```bash
 cd docker/docker-composer
 docker-compose up -d
 ```
 
+#### 方式二：本地开发（推荐）
+
+仅启动基础设施服务，前后端和主服务在本地运行：
+
+```bash
+# 启动基础设施
+cd docker/docker-composer
+docker-compose -f docker-compose.dev.yml up -d
+
+# 本地启动后端服务
+cd manager/backend
+go run main.go
+
+# 本地启动前端服务
+cd manager/frontend
+npm run dev
+
+# 本地启动主服务
+cd cmd/server
+go run main.go -c ../../config/config.yaml
+```
+
+#### 开发环境常用命令
+
+```bash
+# 查看服务状态
+docker-compose -f docker-compose.dev.yml ps
+
+# 查看日志
+docker-compose -f docker-compose.dev.yml logs -f
+
+# 查看单个服务日志
+docker-compose -f docker-compose.dev.yml logs -f postgres
+
+# 停止服务
+docker-compose -f docker-compose.dev.yml down
+
+# 停止并清理数据（慎用）
+docker-compose -f docker-compose.dev.yml down -v
+
+# 重启单个服务
+docker-compose -f docker-compose.dev.yml restart postgres
+```
+
 #### 服务端口
+
+**开发环境 (docker-compose.dev.yml)**
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
-| PostgreSQL | 25432 | 数据库 |
-| Redis | 26379 | 缓存 |
+| PostgreSQL | 15432 | 数据库 |
+| Redis | 16379 | 缓存 |
+| MinIO API | 9000 | 对象存储 API |
+| MinIO Console | 19001 | 管理控制台 |
+
+**生产环境 (docker-compose.yml)**
+
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| PostgreSQL | 25432 | 数据库（映射避免冲突） |
+| Redis | 26379 | 缓存（映射避免冲突） |
 | MinIO API | 9000 | 对象存储 API |
 | MinIO Console | 9001 | 管理控制台 |
 | WebSocket | 8989 | 主服务 |
@@ -166,6 +255,68 @@ docker-compose up -d
 - 地址: http://localhost:9001
 - 用户名: `minioadmin`
 - 密码: `minioadmin123`
+
+#### 本地开发配置示例
+
+开发环境下 `config/config.yaml` 相关配置：
+
+```yaml
+# 后端管理服务地址（本地运行）
+manager:
+  backend_url: "http://127.0.0.1:8080"
+
+# Memory 配置使用 PostgreSQL
+memory:
+  provider: "postgres"
+  postgres:
+    host: "localhost"
+    port: "15432"
+    username: "xiaozhi"
+    password: "xiaozhi_password"
+    database: "xiaozhi_admin"
+    ssl_mode: "disable"
+
+# MinIO 配置
+minio:
+  endpoint: "localhost:9000"
+  access_key_id: "minioadmin"
+  secret_access_key: "minioadmin123"
+  use_ssl: false
+  bucket_audio: "xiaozhi-audio"
+```
+
+后端管理服务配置：
+
+```bash
+# 方式一：使用开发配置文件
+cp manager/backend/config/config.dev.json manager/backend/config/config.json
+
+# 方式二：使用环境变量覆盖
+export DB_TYPE=postgres
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=xiaozhi
+export DB_PASSWORD=xiaozhi_password
+export DB_NAME=xiaozhi_admin
+```
+
+`manager/backend/config/config.dev.json` 已包含 PostgreSQL 配置：
+
+```json
+{
+  "server": { "port": "8080", "mode": "debug" },
+  "database": {
+    "type": "postgres",
+    "host": "127.0.0.1",
+    "port": "15432",
+    "username": "xiaozhi",
+    "password": "xiaozhi_password",
+    "database": "xiaozhi_admin",
+    "ssl_mode": "disable"
+  },
+  "jwt": { "secret": "xiaozhi_admin_secret_key", "expire_hour": 24 }
+}
+```
 
 ### 2. 配置说明
 

@@ -69,12 +69,12 @@ log:
   stdout: true         # 是否输出到控制台
 
 # Redis数据库配置，用于存储设备配置及聊天历史记录，可选
-# redis:
-#   host: ""      # Redis服务器地址
-#   port:              # Redis端口
-#   password: "ticket_dev" # Redis密码
-#   db: 0                  # 使用的数据库编号
-#   key_prefix: "xiaozhi"  # 键名前缀
+redis:
+  host: "localhost"        # Redis服务器地址
+  port: 16379              # Redis端口（开发环境）
+  password: ""             # Redis密码
+  db: 0                    # 使用的数据库编号
+  key_prefix: "xiaozhi"    # 键名前缀
 
 # WebSocket服务配置
 websocket:
@@ -330,7 +330,7 @@ local_mcp:
 
 # Memory 长记忆配置
 memory:
-  provider: "nomemo"  # 记忆提供商: nomemo(无长记忆) llm(短期对话记忆,基于Redis) 或 memobase(长期记忆)
+  provider: "postgres"  # 记忆提供商: nomemo, memobase, mem0, postgres
   # LLM Memory 配置（短期对话记忆）
   # 使用 Redis 存储，配置见上面的 redis 部分
   nomemo:
@@ -352,7 +352,7 @@ memory:
   # PostgreSQL 记忆配置
   postgres:
     host: "localhost"
-    port: "5432"
+    port: "15432"
     username: "xiaozhi"
     password: "xiaozhi_password"
     database: "xiaozhi_admin"

@@ -4,13 +4,11 @@
     "mode": "debug"
   },
   "database": {
-    "type": "postgres",
     "host": "127.0.0.1",
-    "port": "15432",
-    "username": "xiaozhi",
-    "password": "xiaozhi_password",
-    "database": "xiaozhi_admin",
-    "ssl_mode": "disable"
+    "port": "3306",
+    "username": "root",
+    "password": "mysql",
+    "database": "xiaozhi_admin_test"
   },
   "jwt": {
     "secret": "xiaozhi_admin_secret_key",

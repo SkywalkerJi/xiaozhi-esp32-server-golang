@@ -1,0 +1,85 @@
+# 本地开发环境 - 仅启动基础设施服务
+# 前端、后端、主服务在本地单独启动
+#
+# 使用方法:
+#   启动: docker-compose -f docker-compose.dev.yml up -d
+#   停止: docker-compose -f docker-compose.dev.yml down
+#   查看日志: docker-compose -f docker-compose.dev.yml logs -f
+#   清理数据: docker-compose -f docker-compose.dev.yml down -v
+
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库服务
+  postgres:
+    image: postgres:16-alpine
+    container_name: xiaozhi-postgres
+    environment:
+      POSTGRES_USER: xiaozhi
+      POSTGRES_PASSWORD: xiaozhi_password
+      POSTGRES_DB: xiaozhi_admin
+      TZ: Asia/Shanghai
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - xiaozhi-dev
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xiaozhi -d xiaozhi_admin"]
+      timeout: 5s
+      retries: 3
+      interval: 10s
+      start_period: 30s
+
+  # Redis 缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: xiaozhi-redis
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    networks:
+      - xiaozhi-dev
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 5s
+      retries: 3
+      interval: 10s
+
+  # MinIO 对象存储服务
+  minio:
+    image: minio/minio:latest
+    container_name: xiaozhi-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"   # API 端口
+      - "19001:9001"   # 控制台端口
+    volumes:
+      - minio_data:/data
+    networks:
+      - xiaozhi-dev
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      timeout: 5s
+      retries: 3
+      interval: 10s
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  xiaozhi-dev:
+    driver: bridge

@@ -88,10 +88,11 @@ type ClientState struct {
 
 	VoiceStatus
 
-	UdpSendAudioData SendAudioData //发送音频数据
-	Statistic        Statistic     //耗时统计
-	MqttLastActiveTs int64         //最后活跃时间
-	VadLastActiveTs  int64         //vad最后活跃时间, 超过 60s && 没有在tts则断开连接
+	AudioCollector   *AudioCollector //音频收集器，用于保存到 MinIO
+	UdpSendAudioData SendAudioData   //发送音频数据
+	Statistic        Statistic       //耗时统计
+	MqttLastActiveTs int64           //最后活跃时间
+	VadLastActiveTs  int64           //vad最后活跃时间, 超过 60s && 没有在tts则断开连接
 
 	Status string //状态 listening, llmStart, ttsStart
 
@@ -381,6 +382,12 @@ func (state *ClientState) OnVoiceSilence() {
 	state.Vad.Reset() //释放vad实例
 	//asr统计
 	state.SetStartAsrTs() //进行asr统计
+
+	// 保存用户音频到 MinIO
+	if state.AudioCollector != nil {
+		messageID := fmt.Sprintf("user-%d", time.Now().UnixNano())
+		state.AudioCollector.SaveUserAudio(messageID, state.InputAudioFormat.SampleRate, state.InputAudioFormat.Channels)
+	}
 
 	state.SetStatus(ClientStatusListenStop)
 }

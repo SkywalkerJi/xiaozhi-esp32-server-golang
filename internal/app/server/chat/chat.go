@@ -2,7 +2,9 @@ package chat
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -94,6 +96,9 @@ func GenClientState(pctx context.Context, deviceID string) (*ClientState, error)
 		log.Errorf("检查设备激活状态失败: %v", err)
 	}
 
+	// 生成会话 ID
+	sessionID := fmt.Sprintf("%s-%d", deviceID, time.Now().UnixNano())
+
 	clientState := &ClientState{
 		IsActivated:  isDeviceActivated,
 		Dialogue:     &Dialogue{},
@@ -123,7 +128,8 @@ func GenClientState(pctx context.Context, deviceID string) (*ClientState, error)
 			VoiceStop:            false,
 			SilenceThresholdTime: maxSilenceDuration,
 		},
-		SessionCtx: Ctx{},
+		SessionCtx:     Ctx{},
+		AudioCollector: NewAudioCollector(deviceID, sessionID),
 	}
 
 	ttsType := clientState.DeviceConfig.Tts.Provider

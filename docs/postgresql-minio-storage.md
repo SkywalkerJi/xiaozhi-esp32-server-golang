@@ -19,13 +19,31 @@ cd manager/backend && go run main.go
 # 5. 启动前端服务（新终端）
 cd manager/frontend && npm run dev
 
-# 6. 启动主服务（新终端）
+# 6. 设置 onnxruntime 环境变量并启动主服务（新终端）
+export CGO_CFLAGS="-I/usr/local/include/onnxruntime"
+export CGO_LDFLAGS="-L/usr/local/lib -lonnxruntime"
 cd cmd/server && go run main.go -c ../../config/config.yaml
 
 # 访问地址：
 # - 前端管理：http://localhost:5173 (Vite dev server)
 # - 后端 API：http://localhost:8080
 # - MinIO 控制台：http://localhost:19001 (minioadmin/minioadmin123)
+# - PostgreSQL：localhost:15432 (xiaozhi/xiaozhi_password)
+# - Redis：localhost:16379
+```
+
+### 验证存储功能
+
+```bash
+# 检查 PostgreSQL 中的聊天记录
+PGPASSWORD=xiaozhi_password psql -h localhost -p 15432 -U xiaozhi -d xiaozhi_admin -c \
+  "SELECT COUNT(*) as sessions FROM conversation_sessions;"
+
+PGPASSWORD=xiaozhi_password psql -h localhost -p 15432 -U xiaozhi -d xiaozhi_admin -c \
+  "SELECT COUNT(*) as messages FROM conversation_messages;"
+
+# 检查 MinIO 中的音频文件
+docker exec xiaozhi-minio mc ls local/xiaozhi-audio/ --recursive
 ```
 
 ---
@@ -510,6 +528,155 @@ xiaozhi-audio/
 
 ---
 
+## 聊天记录存储
+
+### 工作原理
+
+聊天记录通过 PostgreSQL Memory Provider 自动保存：
+
+```
+用户说话 → ASR 识别 → 消息保存到 PostgreSQL
+LLM 回复 → 消息保存到 PostgreSQL
+```
+
+### 数据表结构
+
+**conversation_sessions（会话表）**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| session_id | VARCHAR(64) | 会话唯一标识 |
+| device_id | VARCHAR(128) | 设备 ID |
+| agent_id | VARCHAR(128) | 智能体 ID |
+| status | VARCHAR(20) | 状态：active, ended, reset |
+| metadata | JSONB | 元数据 |
+
+**conversation_messages（消息表）**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| session_id | VARCHAR(64) | 所属会话 |
+| message_id | VARCHAR(64) | 消息唯一标识 |
+| sequence_num | BIGINT | 消息序号 |
+| role | VARCHAR(20) | 角色：user, assistant, system, tool |
+| content | TEXT | 消息内容 |
+| multi_content | JSONB | 多模态内容 |
+| tool_calls | JSONB | 工具调用 |
+| audio_file_id | VARCHAR(128) | 关联的音频文件 ID |
+
+### 配置方式
+
+1. **在管理后台配置**：添加 Memory 配置，类型选择 `postgres`
+
+2. **直接数据库配置**：
+```sql
+INSERT INTO configs (type, name, config_id, provider, json_data, enabled, is_default)
+VALUES (
+  'memory', 'PostgreSQL Memory', 'postgres', 'postgres',
+  '{"host":"localhost","port":"15432","username":"xiaozhi","password":"xiaozhi_password","database":"xiaozhi_admin","ssl_mode":"disable"}',
+  true, true
+);
+```
+
+### 查询示例
+
+```sql
+-- 查看最近的对话会话
+SELECT session_id, device_id, status, started_at
+FROM conversation_sessions
+ORDER BY started_at DESC LIMIT 10;
+
+-- 查看某个会话的消息
+SELECT role, content, created_at
+FROM conversation_messages
+WHERE session_id = 'xxx'
+ORDER BY sequence_num;
+
+-- 统计每日消息量
+SELECT DATE(created_at) as date, COUNT(*) as count
+FROM conversation_messages
+GROUP BY DATE(created_at)
+ORDER BY date DESC;
+```
+
+---
+
+## 音频文件存储
+
+### 工作原理
+
+音频通过 AudioCollector 收集，自动保存到 MinIO：
+
+```
+用户说话 → 收集 opus 音频帧 → 用户停止说话 → 保存到 MinIO
+TTS 回复 → 收集 opus 音频帧 → TTS 结束 → 保存到 MinIO
+```
+
+### 存储路径结构
+
+```
+xiaozhi-audio/                    # Bucket 名称
+└── {device_id}/                  # 设备目录
+    └── {date}/                   # 日期目录 (YYYY-MM-DD)
+        └── {session_id}/         # 会话目录
+            ├── user-{timestamp}.opus   # 用户输入音频
+            └── tts-{timestamp}.opus    # TTS 输出音频
+```
+
+### 音频元数据表
+
+**audio_files（音频文件表）**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| file_id | VARCHAR(128) | 文件唯一标识 |
+| session_id | VARCHAR(64) | 所属会话 |
+| message_id | VARCHAR(64) | 关联消息 ID |
+| device_id | VARCHAR(128) | 设备 ID |
+| bucket_name | VARCHAR(64) | 存储桶名称 |
+| object_key | VARCHAR(512) | 对象存储路径 |
+| file_type | VARCHAR(20) | 文件类型：opus, wav, mp3, pcm |
+| file_size | BIGINT | 文件大小（字节） |
+| duration_ms | INTEGER | 时长（毫秒） |
+| source_type | VARCHAR(20) | 来源：user, tts, asr |
+
+### 配置说明
+
+在 `config/config.yaml` 中配置 MinIO：
+
+```yaml
+minio:
+  endpoint: "localhost:9000"          # MinIO 服务地址
+  access_key_id: "minioadmin"         # 访问密钥
+  secret_access_key: "minioadmin123"  # 密钥
+  use_ssl: false                      # 是否使用 SSL
+  bucket_audio: "xiaozhi-audio"       # 音频存储桶
+  region: "us-east-1"                 # 区域
+```
+
+### 访问音频文件
+
+**通过 MinIO 控制台**：
+- 地址：http://localhost:19001
+- 用户名：minioadmin
+- 密码：minioadmin123
+
+**通过 mc 命令行**：
+```bash
+# 配置 mc
+mc alias set myminio http://localhost:9000 minioadmin minioadmin123
+
+# 列出音频文件
+mc ls myminio/xiaozhi-audio/
+
+# 下载音频文件
+mc cp myminio/xiaozhi-audio/device123/2026-01-29/session456/user-xxx.opus ./
+```
+
+**通过预签名 URL**：
+```go
+url, err := audioStorage.GetPresignedURL(ctx, objectKey, time.Hour)
+```
+
+---
+
 ## 代码使用示例
 
 ### 使用 PostgreSQL 记忆提供者
@@ -604,6 +771,82 @@ url, err := audioStorage.GetPresignedURL(ctx, metadata.ObjectKey, time.Hour)
 
 ---
 
+## 实现架构
+
+### 核心组件
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        主服务                                │
+├─────────────────────────────────────────────────────────────┤
+│  ChatSession                                                 │
+│    ├── HandleAudioMessage() ──→ AudioCollector.AddUserAudio()│
+│    └── TTSManager                                            │
+│          └── SendTTSAudio() ──→ AudioCollector.AddTTSAudio() │
+├─────────────────────────────────────────────────────────────┤
+│  EventHandle                                                 │
+│    ├── HandleAddMessage() ──→ MemoryProvider.AddMessage()   │
+│    ├── HandleSessionEnd() ──→ MemoryProvider.Flush()        │
+│    └── HandleSaveAudio() ──→ AudioStorage.UploadAudio()     │
+├─────────────────────────────────────────────────────────────┤
+│  EventBus                                                    │
+│    ├── TopicAddMessage  (消息保存事件)                        │
+│    ├── TopicSessionEnd  (会话结束事件)                        │
+│    └── TopicSaveAudio   (音频保存事件)                        │
+└─────────────────────────────────────────────────────────────┘
+          │                              │
+          ▼                              ▼
+┌─────────────────┐            ┌─────────────────┐
+│   PostgreSQL    │            │     MinIO       │
+│ ┌─────────────┐ │            │ ┌─────────────┐ │
+│ │conversation_│ │            │ │xiaozhi-audio│ │
+│ │  sessions   │ │            │ │   bucket    │ │
+│ ├─────────────┤ │            │ └─────────────┘ │
+│ │conversation_│ │            └─────────────────┘
+│ │  messages   │ │
+│ └─────────────┘ │
+└─────────────────┘
+```
+
+### 数据流
+
+**用户输入流程**：
+```
+1. 用户说话（opus 音频流）
+2. HandleAudioMessage() 接收音频帧
+3. AudioCollector.AddUserAudio() 累积音频数据
+4. ASR 识别完成，生成文本消息
+5. EventBus 发布 TopicAddMessage 事件
+6. MemoryProvider.AddMessage() 保存到 PostgreSQL
+7. 用户停止说话，OnVoiceSilence() 触发
+8. AudioCollector.SaveUserAudio() 发布 TopicSaveAudio 事件
+9. AudioStorage.UploadAudio() 保存到 MinIO
+```
+
+**TTS 输出流程**：
+```
+1. LLM 生成回复文本
+2. EventBus 发布 TopicAddMessage 事件
+3. MemoryProvider.AddMessage() 保存到 PostgreSQL
+4. TTS 合成音频，SendTTSAudio() 发送
+5. AudioCollector.AddTTSAudio() 累积音频数据
+6. TTS 完成，AudioCollector.SaveTTSAudio() 触发
+7. EventBus 发布 TopicSaveAudio 事件
+8. AudioStorage.UploadAudio() 保存到 MinIO
+```
+
+### 关键文件
+
+| 文件 | 说明 |
+|------|------|
+| `internal/data/client/audio_collector.go` | 音频收集器，累积音频帧 |
+| `internal/domain/eventbus/types.go` | 事件类型定义 |
+| `internal/app/server/event_handle.go` | 事件处理，MinIO 初始化 |
+| `internal/storage/minio/audio_storage.go` | MinIO 音频存储服务 |
+| `internal/domain/memory/pg_memory/pg_memory.go` | PostgreSQL 记忆提供者 |
+
+---
+
 ## 常见问题
 
 ### Q: PostgreSQL 连接失败
@@ -627,6 +870,58 @@ url, err := audioStorage.GetPresignedURL(ctx, metadata.ObjectKey, time.Hour)
 - 确保安装了相关数据库驱动依赖
 - 检查源数据库和目标数据库连接参数
 - 先使用 `--dry-run` 模式测试
+
+### Q: 聊天记录没有保存
+
+检查以下配置：
+1. Memory Provider 是否设置为 `postgres`
+2. PostgreSQL 连接参数是否正确
+3. 查看日志是否有 Memory Provider 初始化错误
+
+```bash
+# 检查数据库中的 Memory 配置
+psql -h localhost -p 15432 -U xiaozhi -d xiaozhi_admin -c \
+  "SELECT * FROM configs WHERE type = 'memory' AND is_default = true;"
+```
+
+### Q: 音频没有保存到 MinIO
+
+检查以下配置：
+1. `config.yaml` 中是否配置了 `minio` 部分
+2. MinIO 服务是否正常运行
+3. 查看日志是否有 "MinIO 音频存储初始化成功" 或错误信息
+
+```bash
+# 检查 MinIO 服务状态
+docker-compose -f docker-compose.dev.yml ps minio
+
+# 检查 bucket 是否存在
+mc ls myminio/xiaozhi-audio/
+```
+
+### Q: 如何禁用音频保存
+
+在 `config.yaml` 中删除或注释 `minio` 配置部分，主服务启动时会跳过 MinIO 初始化。
+
+### Q: 如何清理过期数据
+
+```sql
+-- 清理 90 天前的消息
+DELETE FROM conversation_messages
+WHERE created_at < NOW() - INTERVAL '90 days';
+
+-- 清理对应的会话（无消息的会话）
+DELETE FROM conversation_sessions s
+WHERE NOT EXISTS (
+  SELECT 1 FROM conversation_messages m
+  WHERE m.session_id = s.session_id
+);
+```
+
+```bash
+# 清理 MinIO 中的过期文件（需要配置生命周期规则）
+mc ilm rule add myminio/xiaozhi-audio --expire-days 90
+```
 
 ---
 

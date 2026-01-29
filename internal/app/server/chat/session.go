@@ -224,6 +224,11 @@ func (c *ChatSession) HandleTextMessage(message []byte) error {
 
 // HandleAudioMessage 处理音频消息
 func (c *ChatSession) HandleAudioMessage(data []byte) bool {
+	// 收集用户音频用于保存到 MinIO
+	if c.clientState.AudioCollector != nil {
+		c.clientState.AudioCollector.AddUserAudio(data)
+	}
+
 	select {
 	case c.clientState.OpusAudioBuffer <- data:
 		return true

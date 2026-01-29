@@ -60,6 +60,15 @@ func (t *TTSManager) processTTSQueue(ctx context.Context) {
 			item.onStartFunc()
 		}
 		err = t.handleTts(item.ctx, item.llmResponse)
+
+		// TTS 结束后保存音频到 MinIO
+		if t.clientState.AudioCollector != nil && t.clientState.AudioCollector.GetTTSAudioSize() > 0 {
+			messageID := fmt.Sprintf("tts-%d", time.Now().UnixNano())
+			t.clientState.AudioCollector.SaveTTSAudio(messageID,
+				t.clientState.OutputAudioFormat.SampleRate,
+				t.clientState.OutputAudioFormat.Channels)
+		}
+
 		if item.onEndFunc != nil {
 			item.onEndFunc(err)
 		}
@@ -203,6 +212,12 @@ func (t *TTSManager) SendTTSAudio(ctx context.Context, audioChan chan []byte, is
 				log.Debugf("SendTTSAudio audioChan closed, exit, 总共发送 %d 帧", totalFrames)
 				return nil
 			}
+
+			// 收集 TTS 音频用于保存到 MinIO
+			if t.clientState.AudioCollector != nil {
+				t.clientState.AudioCollector.AddTTSAudio(frame)
+			}
+
 			// 发送当前帧
 			if err := t.serverTransport.SendAudio(frame); err != nil {
 				log.Errorf("发送 TTS 音频失败: 第 %d 帧, len: %d, 错误: %v", totalFrames, len(frame), err)
